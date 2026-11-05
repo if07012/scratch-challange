@@ -1,0 +1,39 @@
+
+> scratch-challenge@0.1.0 build
+> next build
+
+▲ Next.js 16.4.3 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 41ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 709ms
+  Running TypeScript ...
+  Finished TypeScript in 1846ms ...
+  Collecting page data using 14 workers ...
+  Generating static pages using 14 workers (0/6) ...
+  Generating static pages using 14 workers (1/6) 
+  Generating static pages using 14 workers (2/6) 
+  Generating static pages using 14 workers (4/6) 
+✓ Generating static pages using 14 workers (6/6) in 893ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /api/categories
+├ ƒ /api/categories/[id]
+├ ƒ /api/checklists/[id]
+├ ƒ /api/exercises
+├ ƒ /api/exercises/[id]
+├ ƒ /api/exercises/[id]/checklists
+├ ƒ /categories/[slug]
+└ ƒ /exercises/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
