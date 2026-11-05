@@ -1,4 +1,5 @@
 import { getCategories, getPublishedExercises } from '@/lib/supabase/queries'
+import { createClient } from '@/lib/supabase/server'
 import { ExerciseCard } from '@/components/ExerciseCard'
 
 const difficulties = [
@@ -16,10 +17,22 @@ export async function ExerciseGrid({ searchParams }: ExerciseGridProps) {
   const selectedCategory = resolvedSearchParams.category || 'all'
   const selectedDifficulty = resolvedSearchParams.difficulty || 'all'
 
-  const [categories, exercises] = await Promise.all([
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const [categories, exercises, progressResult] = await Promise.all([
     getCategories(),
     getPublishedExercises(),
+    user
+      ? supabase.from('student_progress').select('exercise_id').eq('user_id', user.id).eq('status', 'completed')
+      : Promise.resolve({ data: [] }),
   ])
+
+  const completedExerciseIds = (progressResult.data || []).map((item) => item.exercise_id)
+  const returnTo = new URLSearchParams()
+  if (selectedCategory !== 'all') returnTo.set('category', selectedCategory)
+  if (selectedDifficulty !== 'all') returnTo.set('difficulty', selectedDifficulty)
+  const returnQuery = returnTo.toString()
+  const returnPath = returnQuery ? `/?${returnQuery}` : '/'
 
   const filteredExercises = exercises.filter((exercise) => {
     const categoryMatch = selectedCategory === 'all' || exercise.category_id === selectedCategory
@@ -35,6 +48,8 @@ export async function ExerciseGrid({ searchParams }: ExerciseGridProps) {
           exercise={exercise}
           categories={categories}
           difficulties={difficulties}
+          completed={completedExerciseIds.includes(exercise.id)}
+          returnTo={returnPath}
         />
       ))}
     </div>

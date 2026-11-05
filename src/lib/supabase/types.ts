@@ -48,6 +48,17 @@ export type StudentProgress = {
   exercise_id: string
   status: 'in_progress' | 'completed'
   completed_at: string | null
+  submitted_scratch_url?: string | null
+  submitted_scratch_name?: string | null
+  submitted_at?: string | null
+  created_at: string
+}
+
+export type StudentChecklistProgress = {
+  id: string
+  user_id: string
+  checklist_id: string
+  completed_at: string
   created_at: string
 }
 

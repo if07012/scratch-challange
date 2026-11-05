@@ -9,9 +9,12 @@ import {
   Clock,
   FileCode,
   ChevronLeft,
+  Upload,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import type { ExerciseWithCategory } from '@/lib/supabase/types'
 
 interface ExerciseDetailClientProps {
@@ -47,7 +50,127 @@ function sanitizeCaseHtml(html: string) {
 }
 
 export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
-  const [activeTab, setActiveTab] = useState<'case' | 'download' | 'video' | 'checklist'>('case')
+  const searchParams = useSearchParams()
+  const requestedBackPath = searchParams.get('from') || '/'
+  const backPath = requestedBackPath.startsWith('/') && !requestedBackPath.startsWith('//') ? requestedBackPath : '/'
+  const [activeTab, setActiveTab] = useState<'case' | 'download' | 'video' | 'checklist' | 'upload'>('case')
+  const [userId, setUserId] = useState<string | null>(null)
+  const [exerciseStatus, setExerciseStatus] = useState<'in_progress' | 'completed'>('in_progress')
+  const [completedChecklistIds, setCompletedChecklistIds] = useState<Set<string>>(new Set())
+  const [progressLoading, setProgressLoading] = useState(true)
+  const [progressSaving, setProgressSaving] = useState(false)
+  const [submittedFileUrl, setSubmittedFileUrl] = useState<string | null>(null)
+  const [submittedFileName, setSubmittedFileName] = useState<string | null>(null)
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadProgress() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!mounted) return
+      if (!user) {
+        setProgressLoading(false)
+        return
+      }
+
+      setUserId(user.id)
+      const [{ data: progress }, { data: checklistItems }] = await Promise.all([
+        supabase.from('student_progress').select('status, submitted_scratch_url, submitted_scratch_name, submitted_at').eq('user_id', user.id).eq('exercise_id', exercise.id).maybeSingle(),
+        supabase.from('student_checklist_progress').select('checklist_id').eq('user_id', user.id),
+      ])
+
+      if (!mounted) return
+      setExerciseStatus(progress?.status === 'completed' ? 'completed' : 'in_progress')
+      setSubmittedFileUrl(progress?.submitted_scratch_url ?? null)
+      setSubmittedFileName(progress?.submitted_scratch_name ?? null)
+      setSubmittedAt(progress?.submitted_at ?? null)
+      const validIds = new Set(exercise.checklists.map((item) => item.id))
+      setCompletedChecklistIds(new Set((checklistItems || []).map((item) => item.checklist_id).filter((id) => validIds.has(id))))
+      setProgressLoading(false)
+    }
+
+    loadProgress()
+    return () => { mounted = false }
+  }, [exercise.id, exercise.checklists, supabase])
+
+  async function updateExerciseStatus(status: 'in_progress' | 'completed') {
+    if (!userId) return
+    setProgressSaving(true)
+    const { error } = await supabase.from('student_progress').upsert({
+      user_id: userId,
+      exercise_id: exercise.id,
+      status,
+      completed_at: status === 'completed' ? new Date().toISOString() : null,
+    }, { onConflict: 'user_id,exercise_id' })
+    if (!error) setExerciseStatus(status)
+    setProgressSaving(false)
+  }
+
+  async function toggleChecklist(checklistId: string, completed: boolean) {
+    if (!userId) return
+    setProgressSaving(true)
+    if (completed) {
+      const { error } = await supabase.from('student_checklist_progress').upsert({
+        user_id: userId,
+        checklist_id: checklistId,
+        completed_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,checklist_id' })
+      if (!error) setCompletedChecklistIds((current) => new Set(current).add(checklistId))
+    } else {
+      const { error } = await supabase
+        .from('student_checklist_progress')
+        .delete()
+        .eq('user_id', userId)
+        .eq('checklist_id', checklistId)
+      if (!error) setCompletedChecklistIds((current) => {
+        const next = new Set(current)
+        next.delete(checklistId)
+        return next
+      })
+    }
+    setProgressSaving(false)
+  }
+
+  async function uploadSubmission(file: File) {
+    if (!userId) return
+    setUploadError(null)
+    setProgressSaving(true)
+
+    const form = new FormData()
+    form.append('file', file)
+    form.append('kind', 'scratch')
+    const response = await fetch('/api/upload', { method: 'POST', body: form })
+    const result = await response.json() as { url?: string; error?: string }
+    if (!response.ok || !result.url) {
+      setUploadError(result.error || 'Gagal mengunggah file Scratch')
+      setProgressSaving(false)
+      return
+    }
+
+    const submittedAtValue = new Date().toISOString()
+    const { error } = await supabase.from('student_progress').upsert({
+      user_id: userId,
+      exercise_id: exercise.id,
+      status: exerciseStatus,
+      completed_at: exerciseStatus === 'completed' ? submittedAtValue : null,
+      submitted_scratch_url: result.url,
+      submitted_scratch_name: file.name,
+      submitted_at: submittedAtValue,
+    }, { onConflict: 'user_id,exercise_id' })
+
+    if (error) {
+      setUploadError(error.message)
+    } else {
+      setSubmittedFileUrl(result.url)
+      setSubmittedFileName(file.name)
+      setSubmittedAt(submittedAtValue)
+    }
+    setProgressSaving(false)
+  }
+
   const videoUrl = getGoogleDriveMediaUrl(exercise.video_url, 'video') || exercise.video_url
   const scratchFileName = exercise.scratch_file_name?.trim() || 'project.sb3'
   const downloadFileName = /\.sb3$/i.test(scratchFileName) ? scratchFileName : `${scratchFileName}.sb3`
@@ -94,7 +217,7 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <Link href="/exercises" className="text-gray-600 hover:text-gray-900 flex items-center gap-1">
+              <Link href={backPath} className="text-gray-600 hover:text-gray-900 flex items-center gap-1">
                 <ChevronLeft className="w-4 h-4" />
                 Kembali
               </Link>
@@ -126,6 +249,27 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
             </span>
           </div>
           <p className="text-gray-600">{exercise.short_description}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {userId ? (
+              <>
+                <span className={cn('px-3 py-1 text-sm font-medium rounded-full', exerciseStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700')}>
+                  {exerciseStatus === 'completed' ? '✓ Latihan selesai' : 'Belum selesai'}
+                </span>
+                <button
+                  type="button"
+                  disabled={progressLoading || progressSaving}
+                  onClick={() => updateExerciseStatus(exerciseStatus === 'completed' ? 'in_progress' : 'completed')}
+                  className={cn('rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60', exerciseStatus === 'completed' ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' : 'bg-green-600 text-white hover:bg-green-700')}
+                >
+                  {exerciseStatus === 'completed' ? 'Tandai belum selesai' : 'Tandai latihan selesai'}
+                </button>
+              </>
+            ) : !progressLoading ? (
+              <Link href="/login" className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100">
+                Login untuk menyimpan progress
+              </Link>
+            ) : null}
+          </div>
         </div>
 
         <div className="border-b border-gray-200 mb-6">
@@ -174,6 +318,19 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
             >
               <CheckSquare className="w-4 h-4 inline mr-1" /> Checklist
             </button>
+            {userId && (
+              <button
+                onClick={() => setActiveTab('upload')}
+                className={cn(
+                  'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
+                  activeTab === 'upload'
+                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <Upload className="w-4 h-4 inline mr-1" /> Unggah Scratch
+              </button>
+            )}
           </nav>
         </div>
 
@@ -288,23 +445,77 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
             </div>
           )}
 
+          {activeTab === 'upload' && userId && (
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Unggah hasil pekerjaan Scratch</h3>
+                <p className="mt-1 text-sm text-gray-600">Pilih file <strong>.sb3</strong> dari project yang sudah kamu kerjakan.</p>
+              </div>
+
+              {submittedFileUrl && (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <p className="font-medium text-green-800">File terakhir berhasil disimpan</p>
+                  <p className="mt-1 text-sm text-green-700">{submittedFileName}</p>
+                  {submittedAt && (
+                    <p className="mt-1 text-xs text-green-700">Diunggah {new Date(submittedAt).toLocaleString('id-ID')}</p>
+                  )}
+                  <a href={submittedFileUrl} download={submittedFileName || 'project.sb3'} className="mt-3 inline-block text-sm font-medium text-green-700 underline">
+                    Unduh hasil unggahan
+                  </a>
+                </div>
+              )}
+
+              {uploadError && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {uploadError}
+                </div>
+              )}
+
+              <label className="block rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                <span className="mt-2 block text-sm font-medium text-gray-700">Pilih file Scratch (.sb3)</span>
+                <input
+                  type="file"
+                  accept=".sb3"
+                  disabled={progressSaving}
+                  className="mt-4 block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-blue-700"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) void uploadSubmission(file)
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+          )}
+
           {activeTab === 'checklist' && (
             <div className="space-y-3">
               <h4 className="font-semibold text-gray-900 mb-4">Periksa pekerjaanmu:</h4>
-              <ul className="space-y-3">
-                {exercise.checklists.map((item) => (
-                  <li key={item.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    <input
-                      type="checkbox"
-                      id={`check-${item.id}`}
-                      className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <label htmlFor={`check-${item.id}`} className="text-gray-700 cursor-pointer">
-                      {item.description}
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              {progressLoading ? (
+                <p className="py-4 text-sm text-gray-500">Memuat progress...</p>
+              ) : (
+                <ul className="space-y-3">
+                  {exercise.checklists.map((item) => {
+                    const completed = completedChecklistIds.has(item.id)
+                    return (
+                      <li key={item.id} className={cn('flex items-start gap-3 p-3 rounded-lg', completed ? 'bg-green-50' : 'bg-gray-50')}>
+                        <input
+                          type="checkbox"
+                          id={`check-${item.id}`}
+                          checked={completed}
+                          disabled={!userId || progressSaving}
+                          onChange={(event) => toggleChecklist(item.id, event.target.checked)}
+                          className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                        />
+                        <label htmlFor={`check-${item.id}`} className={cn('cursor-pointer', completed ? 'text-green-800 line-through' : 'text-gray-700')}>
+                          {item.description}
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
               {exercise.checklists.length === 0 && (
                 <p className="text-gray-500 text-center py-8">Belum ada checklist untuk latihan ini.</p>
               )}

@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { getExerciseBySlug } from '@/lib/supabase/queries'
 import { ExerciseDetailClient } from './ExerciseDetailClient'
-import type { ExerciseWithCategory } from '@/lib/supabase/types'
 
 interface ExerciseDetailPageProps {
   params: Promise<{ slug: string }>
@@ -17,7 +17,7 @@ export default async function ExerciseDetail({ params }: ExerciseDetailPageProps
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Latihan tidak ditemukan</h1>
           <p className="text-gray-600">Latihan yang Anda cari tidak ada atau belum dipublikasikan.</p>
-          <a href="/exercises" className="mt-4 inline-block text-blue-600 hover:underline">Kembali ke daftar latihan</a>
+          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">Kembali ke daftar latihan</Link>
         </div>
       </div>
     )
