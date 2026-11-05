@@ -94,6 +94,7 @@ export function AdminDashboardClient({ categories, exercises }: AdminDashboardCl
   const [createCaseDescription, setCreateCaseDescription] = useState('')
   const [editingCaseDescription, setEditingCaseDescription] = useState('')
   const [aiFixing, setAiFixing] = useState(false)
+  const [aiSuggestingChecklist, setAiSuggestingChecklist] = useState(false)
 
   useEffect(() => {
     const googleResult = new URLSearchParams(window.location.search).get('google')
@@ -276,6 +277,42 @@ export function AdminDashboardClient({ categories, exercises }: AdminDashboardCl
       alert(error instanceof Error ? error.message : 'GroqAI gagal memperbaiki deskripsi')
     } finally {
       setAiFixing(false)
+    }
+  }
+
+  const suggestChecklistWithAI = async (
+    problemStatement: string,
+    title: string,
+    currentChecklist: string,
+    setChecklist: (value: string) => void,
+  ) => {
+    if (!problemStatement.trim()) {
+      alert('Isi Pernyataan Masalah terlebih dahulu sebelum meminta saran checklist.')
+      return
+    }
+
+    setAiSuggestingChecklist(true)
+    try {
+      const response = await fetch('/api/ai/fix-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'suggest-checklist', problem_statement: problemStatement, title }),
+      })
+      const result = await response.json() as { items?: string[]; error?: string }
+      if (!response.ok) throw new Error(result.error || 'GroqAI gagal menyarankan checklist')
+      if (!result.items?.length) throw new Error('GroqAI tidak mengembalikan saran checklist')
+
+      const existing = new Set(currentChecklist.split('\n').map((item) => item.trim()).filter(Boolean))
+      const additions = result.items.filter((item) => !existing.has(item.trim()))
+      const combined = [
+        ...currentChecklist.split('\n').map((item) => item.trim()).filter(Boolean),
+        ...additions,
+      ]
+      setChecklist(combined.join('\n'))
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'GroqAI gagal menyarankan checklist')
+    } finally {
+      setAiSuggestingChecklist(false)
     }
   }
 
@@ -486,7 +523,24 @@ Tujuan 3" />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Checklist Tugas</label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="block text-sm font-medium text-gray-700">Checklist Tugas</label>
+          <button
+            type="button"
+            disabled={aiSuggestingChecklist}
+            onClick={(event) => {
+              const form = event.currentTarget.closest('form')
+              const titleInput = form?.elements.namedItem('title')
+              const problemInput = form?.elements.namedItem('problem_statement')
+              const title = titleInput instanceof HTMLInputElement ? titleInput.value : ''
+              const problemStatement = problemInput instanceof HTMLTextAreaElement ? problemInput.value : ''
+              void suggestChecklistWithAI(problemStatement, title, createChecklistText, setCreateChecklistText)
+            }}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
+          </button>
+        </div>
         <textarea value={createChecklistText} onChange={(event) => setCreateChecklistText(event.target.value)} rows={4} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500" placeholder="Satu item per baris, contoh: Tambahkan sprite kucing" />
         <p className="mt-1 text-xs text-gray-500">Setiap baris akan menjadi satu item checklist.</p>
       </div>
@@ -598,7 +652,29 @@ Tujuan 3" />
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Checklist Tugas</label>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="block text-sm font-medium text-gray-700">Checklist Tugas</label>
+            <button
+              type="button"
+              disabled={aiSuggestingChecklist}
+              onClick={(event) => {
+                const form = event.currentTarget.closest('form')
+                const problemInput = form?.elements.namedItem('problem_statement')
+                const problemStatement = problemInput instanceof HTMLTextAreaElement
+                  ? problemInput.value
+                  : editingExercise.problem_statement || ''
+                void suggestChecklistWithAI(
+                  problemStatement,
+                  editingExercise.title,
+                  editingChecklistText,
+                  setEditingChecklistText,
+                )
+              }}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
+            </button>
+          </div>
           <textarea value={editingChecklistText} onChange={(event) => setEditingChecklistText(event.target.value)} rows={4} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500" placeholder="Satu item per baris" />
           <p className="mt-1 text-xs text-gray-500">Setiap baris akan menjadi satu item checklist.</p>
         </div>
