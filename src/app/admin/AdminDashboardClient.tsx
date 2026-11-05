@@ -39,8 +39,12 @@ function HtmlEditor({ name, value, onChange, placeholder }: { name: string; valu
         <button type="button" className={toolbarButton} onClick={() => format('bold')}><b>B</b></button>
         <button type="button" className={toolbarButton} onClick={() => format('italic')}><i>I</i></button>
         <button type="button" className={toolbarButton} onClick={() => format('underline')}><u>U</u></button>
+        <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h1')}>H1</button>
         <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h2')}>H2</button>
         <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h3')}>H3</button>
+        <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h4')}>H4</button>
+        <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h5')}>H5</button>
+        <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'h6')}>H6</button>
         <button type="button" className={toolbarButton} onClick={() => format('formatBlock', 'p')}>P</button>
         <button type="button" className={toolbarButton} onClick={() => format('insertUnorderedList')}>• Daftar</button>
         <button type="button" className={toolbarButton} onClick={() => format('insertOrderedList')}>1. Daftar</button>

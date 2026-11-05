@@ -23,7 +23,7 @@ function sanitizeCaseHtml(html: string) {
   const parsed = new DOMParser().parseFromString(html, 'text/html')
   parsed.querySelectorAll('script, style, iframe, object, embed, form, input, button').forEach((element) => element.remove())
 
-  const allowedTags = new Set(['P', 'DIV', 'SPAN', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'A'])
+  const allowedTags = new Set(['P', 'DIV', 'SPAN', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'A'])
   parsed.body.querySelectorAll('*').forEach((element) => {
     if (!allowedTags.has(element.tagName)) {
       element.replaceWith(...Array.from(element.childNodes))
@@ -179,11 +179,21 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           {activeTab === 'case' && (
-            <div className="max-w-none text-gray-800 [&_*]:text-inherit">
+            <div className="exercise-case-card">
+              <div className="exercise-case-heading">
+                <div className="exercise-case-heading-icon">📖</div>
+                <div>
+                  <p className="exercise-case-kicker">Deskripsi Kasus</p>
+                  <h2 className="exercise-case-title">Cermati tantangan ini</h2>
+                </div>
+              </div>
               {caseHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: caseHtml }} />
+                <article
+                  className="exercise-case-content"
+                  dangerouslySetInnerHTML={{ __html: caseHtml }}
+                />
               ) : (
-                <p className="text-gray-600">Deskripsi kasus belum tersedia.</p>
+                <p className="rounded-xl bg-gray-50 px-5 py-4 text-gray-600">Deskripsi kasus belum tersedia.</p>
               )}
             </div>
           )}
