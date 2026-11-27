@@ -3,6 +3,7 @@ import { getCategories } from "@/lib/supabase/queries"
 import { ClientFilters } from "./ClientFilters"
 import { ExerciseGrid } from "./ExerciseGrid"
 import { createClient } from "@/lib/supabase/server"
+import { LogoutButton } from "@/components/LogoutButton"
 import { getPublishedExercises } from "@/lib/supabase/queries"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -55,9 +56,12 @@ export default async function Home({
               <h1 className="text-xl font-bold text-neutral-900">Scratch Challenge</h1>
             </div>
             <div className="flex items-center gap-4">
-              <Link href="/admin" className="text-sm text-neutral-600 hover:text-neutral-900 font-medium transition-colors">
-                Admin
-              </Link>
+              {user?.app_metadata?.role === "admin" && (
+                <Link href="/admin" className="text-sm text-neutral-600 hover:text-neutral-900 font-medium transition-colors">
+                  Admin
+                </Link>
+              )}
+              {user && <LogoutButton className="text-sm text-neutral-600 hover:text-neutral-900 font-medium transition-colors" />}
             </div>
           </div>
         </div>

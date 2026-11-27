@@ -1,76 +1,51 @@
 import { createClient } from '@/lib/supabase/server'
+import { getGoogleDriveToken, isGoogleDriveConfigured } from '@/lib/google-drive'
 import { NextRequest, NextResponse } from 'next/server'
-import { createSign } from 'node:crypto'
 
-function base64Url(value: string | Buffer) {
-  return Buffer.from(value).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-}
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+type UploadKind = 'image' | 'video' | 'scratch'
 
-async function getGoogleAccessToken() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!raw) return null
-  const account = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string }
-  const now = Math.floor(Date.now() / 1000)
-  const header = base64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const payload = base64Url(JSON.stringify({
-    iss: account.client_email,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    aud: account.token_uri || 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }))
-  const signer = createSign('RSA-SHA256')
-  signer.update(`${header}.${payload}`)
-  const assertion = `${header}.${payload}.${base64Url(signer.sign(account.private_key))}`
-  const response = await fetch(account.token_uri || 'https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+// Fallback when Drive is unconfigured or its token/upload fails.
+async function uploadToSupabase(supabase: SupabaseClient, file: File, userId: string, kind: UploadKind) {
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(-120)
+  const path = `${userId}/${crypto.randomUUID()}-${safeName}`
+  const { error } = await supabase.storage.from('uploads').upload(path, file, {
+    contentType: file.type || 'application/octet-stream',
+    upsert: false,
   })
-  if (!response.ok) throw new Error('Google Drive authentication failed')
-  const data = await response.json() as { access_token: string }
-  return data.access_token
+  if (error) {
+    throw new Error(
+      error.message.includes('Bucket not found')
+        ? 'Penyimpanan cadangan belum dibuat: jalankan migration upload_fallback_bucket'
+        : `Upload cadangan gagal: ${error.message}`,
+    )
+  }
+
+  const { data } = supabase.storage.from('uploads').getPublicUrl(path)
+  // Only images can be thumbnails; a video/scratch URL here would break next/image.
+  return { id: path, url: data.publicUrl, thumbnailUrl: kind === 'image' ? data.publicUrl : null }
 }
 
-async function uploadToGoogleDrive(file: File, kind: 'image' | 'video' | 'scratch', googleAccessToken?: string) {
+async function uploadToGoogleDrive(file: File, kind: UploadKind) {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
   if (!folderId) throw new Error('GOOGLE_DRIVE_FOLDER_ID is not configured')
-  const token = googleAccessToken || await getGoogleAccessToken()
-  if (!token) throw new Error('Configure Google OAuth credentials or GOOGLE_SERVICE_ACCOUNT_JSON')
+  const token = await getGoogleDriveToken()
 
-  const uploadWithParent = async (parentId?: string) => {
-    const metadata = {
-      name: file.name,
-      mimeType: file.type,
-      ...(parentId ? { parents: [parentId] } : {}),
-    }
-    const form = new FormData()
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-    form.append('file', file)
+  const metadata = { name: file.name, mimeType: file.type, parents: [folderId] }
+  const form = new FormData()
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+  form.append('file', file)
 
-    return fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webContentLink', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    })
-  }
-
-  let response = await uploadWithParent(folderId)
-  if (!response.ok) {
-    const parentError = await response.text()
-    console.error('Google Drive folder upload failed:', parentError)
-
-    if (parentError.includes('insufficientParentPermissions') || parentError.includes('notFound')) {
-      response = await uploadWithParent()
-    } else {
-      throw new Error('Google Drive upload failed')
-    }
-  }
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  })
   if (!response.ok) {
     console.error('Google Drive upload failed:', await response.text())
     throw new Error('Google Drive upload failed')
   }
-  const data = await response.json() as { id: string; webContentLink?: string }
+  const data = await response.json() as { id: string }
 
   const permissionResponse = await fetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(data.id)}/permissions?supportsAllDrives=true`,
@@ -89,7 +64,7 @@ async function uploadToGoogleDrive(file: File, kind: 'image' | 'video' | 'scratc
   const downloadUrl = kind === 'scratch'
     ? `/api/upload?id=${encodeURIComponent(data.id)}&kind=file`
     : kind === 'video'
-      ? (data.webContentLink || `/api/upload?id=${encodeURIComponent(data.id)}&kind=video`)
+      ? `/api/upload?id=${encodeURIComponent(data.id)}&kind=video`
       : thumbnailUrl
   return { id: data.id, url: downloadUrl, thumbnailUrl }
 }
@@ -125,7 +100,7 @@ export async function GET(request: NextRequest) {
       })
 
       if (!upstream.ok && upstream.status !== 206) {
-        const token = await getGoogleAccessToken()
+        const token = await getGoogleDriveToken().catch(() => null)
         if (token) {
           upstream = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, {
             cache: 'no-store',
@@ -179,7 +154,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'File is required' }, { status: 400 })
   }
 
-  const googleAccessToken = String(form.get('google_access_token') || request.cookies.get('google_access_token')?.value || '').trim() || undefined
   const kindParam = String(form.get('kind') || '').trim()
   const kind = kindParam === 'video' ? 'video' : kindParam === 'scratch' ? 'scratch' : 'image'
 
@@ -187,10 +161,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'File Scratch harus berformat .sb3' }, { status: 400 })
   }
 
+  if (!isGoogleDriveConfigured()) {
+    try {
+      return NextResponse.json(await uploadToSupabase(supabase, file, user.id, kind))
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Upload failed' }, { status: 500 })
+    }
+  }
+
   try {
-    const result = await uploadToGoogleDrive(file, kind, googleAccessToken)
-    return NextResponse.json(result)
+    return NextResponse.json(await uploadToGoogleDrive(file, kind))
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Upload failed' }, { status: 500 })
+    console.error('Google Drive upload failed, falling back to Supabase Storage:', error)
+    try {
+      return NextResponse.json(await uploadToSupabase(supabase, file, user.id, kind))
+    } catch (fallbackError) {
+      return NextResponse.json({ error: fallbackError instanceof Error ? fallbackError.message : 'Upload failed' }, { status: 500 })
+    }
   }
 }

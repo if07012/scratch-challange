@@ -1,12 +1,26 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import Link from 'next/link'
+import { cn, captureVideoThumbnail } from '@/lib/utils'
+import { LogoutButton } from '@/components/LogoutButton'
 import {
   Plus,
   Edit,
   Trash2,
   Search,
-  LayoutDashboard
+  LayoutDashboard,
+  Users,
+  FileText,
+  CheckCircle2,
+  Clock,
+  Archive,
+  Sparkles,
+  ListChecks,
+  Upload,
+  Video,
+  HardDrive,
+  Wand2,
+  Info,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Exercise, ExerciseChecklist } from '@/lib/supabase/types'
@@ -31,11 +45,11 @@ function HtmlEditor({ name, value, onChange, placeholder }: { name: string; valu
     if (url) format('createLink', url)
   }
 
-  const toolbarButton = 'rounded border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100'
+  const toolbarButton = 'rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:border-neutral-300 transition-colors'
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 rounded-t-lg border border-gray-300 bg-gray-50 p-2">
+      <div className="flex flex-wrap gap-1 rounded-t-xl border border-neutral-300 border-b-neutral-200 bg-neutral-50 p-2">
         <button type="button" className={toolbarButton} onClick={() => format('bold')}><b>B</b></button>
         <button type="button" className={toolbarButton} onClick={() => format('italic')}><i>I</i></button>
         <button type="button" className={toolbarButton} onClick={() => format('underline')}><u>U</u></button>
@@ -61,9 +75,28 @@ function HtmlEditor({ name, value, onChange, placeholder }: { name: string; valu
         data-placeholder={placeholder}
         onInput={(event) => onChange(event.currentTarget.innerHTML)}
         onBlur={(event) => onChange(event.currentTarget.innerHTML)}
-        className="min-h-40 rounded-b-lg border border-t-0 border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 [&:empty]:before:text-gray-400 [&:empty]:before:content-[attr(data-placeholder)]"
+        className="min-h-40 rounded-b-xl border border-neutral-300 bg-white px-4 py-3 text-neutral-900 outline-none focus:ring-2 focus:ring-primary-500 [&:empty]:before:text-neutral-400 [&:empty]:before:content-[attr(data-placeholder)]"
       />
       <input type="hidden" name={name} value={value} />
+    </div>
+  )
+}
+
+const inputClass = 'w-full rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition'
+const labelClass = 'block text-sm font-semibold text-neutral-700 mb-1.5'
+const hintClass = 'mt-1 text-xs text-neutral-500'
+const sectionClass = 'rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 sm:p-5 space-y-4'
+
+function SectionHeading({ icon: Icon, title, hint }: { icon: React.ComponentType<{ className?: string }>; title: string; hint?: string }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-600 flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4" />
+      </div>
+      <div>
+        <h3 className="text-sm font-bold text-neutral-900">{title}</h3>
+        {hint && <p className="text-xs text-neutral-500">{hint}</p>}
+      </div>
     </div>
   )
 }
@@ -72,9 +105,10 @@ interface AdminDashboardClientProps {
   categories: Category[]
   exercises: Exercise[]
   googleResult?: string
+  driveConfigured: boolean
 }
 
-export function AdminDashboardClient({ categories, exercises, googleResult }: AdminDashboardClientProps) {
+export function AdminDashboardClient({ categories, exercises, googleResult, driveConfigured }: AdminDashboardClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterDifficulty, setFilterDifficulty] = useState('all')
@@ -82,12 +116,9 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
   const [uploading, setUploading] = useState('')
-  const [googleConnected, setGoogleConnected] = useState(() => googleResult === 'connected')
-  const [googleTokenStatus, setGoogleTokenStatus] = useState(() => {
-    if (googleResult === 'connected') return 'Google Drive berhasil terhubung.'
-    if (googleResult === 'missing_config') return 'Tambahkan GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET di environment aplikasi.'
-    return googleResult ? `Google consent gagal: ${googleResult}` : ''
-  })
+  const googleTokenStatus = googleResult === 'missing_config'
+    ? 'Tambahkan GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET di environment aplikasi.'
+    : googleResult ? `Google consent gagal: ${googleResult}` : ''
   const [createChecklistText, setCreateChecklistText] = useState('')
   const [editingChecklistText, setEditingChecklistText] = useState('')
   const [editingChecklists, setEditingChecklists] = useState<ExerciseChecklist[]>([])
@@ -97,19 +128,7 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
   const [aiSuggestingChecklist, setAiSuggestingChecklist] = useState(false)
 
   useEffect(() => {
-    if (googleResult) {
-      window.history.replaceState({}, '', '/admin')
-      return
-    }
-    fetch('/api/google-drive/token')
-      .then((response) => response.json())
-      .then((status) => {
-        if (status.connected) {
-          setGoogleConnected(true)
-          setGoogleTokenStatus('Google Drive terhubung.')
-        }
-      })
-      .catch(() => undefined)
+    if (googleResult) window.history.replaceState({}, '', '/admin')
   }, [googleResult])
 
   const filteredExercises = exercises.filter((exercise) => {
@@ -122,15 +141,28 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
   })
 
   const statusStyles = {
-    published: 'bg-green-100 text-green-700',
-    draft: 'bg-yellow-100 text-yellow-700',
-    archived: 'bg-gray-100 text-gray-700',
+    published: 'bg-success-100 text-success-700 ring-1 ring-success-200',
+    draft: 'bg-accent-100 text-accent-700 ring-1 ring-accent-200',
+    archived: 'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200',
   }
 
   const statusLabels = {
     published: 'Dipublikasikan',
     draft: 'Draft',
     archived: 'Arsip',
+  }
+
+  const difficultyLabels = {
+    beginner: 'Pemula',
+    intermediate: 'Menengah',
+    advanced: 'Mahir',
+  }
+
+  const counts = {
+    total: exercises.length,
+    published: exercises.filter((item) => item.status === 'published').length,
+    draft: exercises.filter((item) => item.status === 'draft').length,
+    archived: exercises.filter((item) => item.status === 'archived').length,
   }
 
   const getCategoryName = (categoryId: string | null) => {
@@ -141,7 +173,7 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
 
   const handleCreate = async (formData: FormData) => {
     const data = Object.fromEntries(formData)
-    
+
     const instructions = data.instructions ? String(data.instructions).split('\n').filter(Boolean) : []
     const learningObjectives = data.learning_objectives ? String(data.learning_objectives).split('\n').filter(Boolean) : []
 
@@ -357,9 +389,22 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
         if (nameField instanceof HTMLInputElement && !nameField.value) nameField.value = file.name
       }
 
-      if (kind === 'video' && typeof result.thumbnailUrl === 'string') {
+      if (kind === 'video') {
         const thumbnailField = form.elements.namedItem('thumbnail_url')
-        if (thumbnailField instanceof HTMLInputElement) thumbnailField.value = result.thumbnailUrl
+        // Drive returns its own thumbnail; Supabase fallback returns none, so grab a frame in the browser.
+        let thumbnailUrl: string | null = typeof result.thumbnailUrl === 'string' ? result.thumbnailUrl : null
+        if (!thumbnailUrl && thumbnailField instanceof HTMLInputElement) {
+          const frame = await captureVideoThumbnail(file)
+          if (frame) {
+            const thumbBody = new FormData()
+            thumbBody.append('file', frame)
+            thumbBody.append('kind', 'image')
+            const thumbResponse = await fetch('/api/upload', { method: 'POST', body: thumbBody })
+            const thumbResult = await thumbResponse.json() as { url?: string }
+            if (thumbResponse.ok && thumbResult.url) thumbnailUrl = thumbResult.url
+          }
+        }
+        if (thumbnailUrl && thumbnailField instanceof HTMLInputElement) thumbnailField.value = thumbnailUrl
       }
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Upload gagal')
@@ -369,124 +414,141 @@ export function AdminDashboardClient({ categories, exercises, googleResult }: Ad
   }
 
   const renderCreateForm = () => (
-    <form id="create-exercise-form" onSubmit={(e) => { e.preventDefault(); handleCreate(new FormData(e.currentTarget)) }} className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Judul *</label>
-        <input name="title" type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
-        <input name="slug" type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi Singkat</label>
-        <textarea name="description" rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-      </div>
-      <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="block text-sm font-medium text-gray-700">Deskripsi Kasus (HTML)</label>
-          <button
-            type="button"
-            disabled={aiFixing}
-            onClick={(event) => {
-              const form = event.currentTarget.closest('form')
-              const titleInput = form?.elements.namedItem('title')
-              const title = titleInput instanceof HTMLInputElement ? titleInput.value : ''
-              void fixDescriptionWithAI(createCaseDescription, title, setCreateCaseDescription)
-            }}
-            className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {aiFixing ? 'Memperbaiki...' : 'AI Perbaiki Deskripsi'}
-          </button>
+    <form id="create-exercise-form" onSubmit={(e) => { e.preventDefault(); handleCreate(new FormData(e.currentTarget)) }} className="space-y-5">
+      <div className={sectionClass}>
+        <SectionHeading icon={FileText} title="Informasi Dasar" hint="Judul dan ringkasan latihan" />
+        <div>
+          <label className={labelClass}>Judul *</label>
+          <input name="title" type="text" className={inputClass} required />
         </div>
-        <HtmlEditor name="case_description" value={createCaseDescription} onChange={setCreateCaseDescription} placeholder="Tulis deskripsi kasus lengkap..." />
+        <div>
+          <label className={labelClass}>Slug *</label>
+          <input name="slug" type="text" className={inputClass} required />
+        </div>
+        <div>
+          <label className={labelClass}>Deskripsi Singkat</label>
+          <textarea name="description" rows={3} className={inputClass} />
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Pernyataan Masalah</label>
-        <textarea name="problem_statement" rows={4} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Pernyataan masalah yang harus diselesaikan..." />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Instruksi (satu per baris)</label>
-        <textarea name="instructions" rows={4} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Instruksi 1
+
+      <div className={sectionClass}>
+        <SectionHeading icon={ListChecks} title="Konten Latihan" hint="Deskripsi kasus, masalah, instruksi, dan tujuan" />
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <label className={labelClass + ' mb-0'}>Deskripsi Kasus (HTML)</label>
+            <button
+              type="button"
+              disabled={aiFixing}
+              onClick={(event) => {
+                const form = event.currentTarget.closest('form')
+                const titleInput = form?.elements.namedItem('title')
+                const title = titleInput instanceof HTMLInputElement ? titleInput.value : ''
+                void fixDescriptionWithAI(createCaseDescription, title, setCreateCaseDescription)
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              {aiFixing ? 'Memperbaiki...' : 'AI Perbaiki Deskripsi'}
+            </button>
+          </div>
+          <HtmlEditor name="case_description" value={createCaseDescription} onChange={setCreateCaseDescription} placeholder="Tulis deskripsi kasus lengkap..." />
+        </div>
+        <div>
+          <label className={labelClass}>Pernyataan Masalah</label>
+          <textarea name="problem_statement" rows={4} className={inputClass} placeholder="Pernyataan masalah yang harus diselesaikan..." />
+        </div>
+        <div>
+          <label className={labelClass}>Instruksi (satu per baris)</label>
+          <textarea name="instructions" rows={4} className={inputClass} placeholder="Instruksi 1
 Instruksi 2
 Instruksi 3" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Tujuan Pembelajaran (satu per baris)</label>
-        <textarea name="learning_objectives" rows={4} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Tujuan 1
+        </div>
+        <div>
+          <label className={labelClass}>Tujuan Pembelajaran (satu per baris)</label>
+          <textarea name="learning_objectives" rows={4} className={inputClass} placeholder="Tujuan 1
 Tujuan 2
 Tujuan 3" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Kategori *</label>
-          <select name="category_id" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white" required>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tingkat Kesulitan *</label>
-          <select name="difficulty" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white" required>
-            <option value="beginner">Pemula</option>
-            <option value="intermediate">Menengah</option>
-            <option value="advanced">Lanjutan</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Estimasi Waktu (menit)</label>
-          <input name="estimated_minutes" type="number" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail URL</label>
-          <input name="thumbnail_url" type="url" className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Thumbnail otomatis akan diisi saat video diunggah" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">File Scratch URL / Upload .sb3</label>
-          <input name="scratch_file_url" type="url" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="https://... atau unggah file .sb3" />
-          <input type="file" accept=".sb3,application/octet-stream" onChange={(event) => uploadMedia(event.target.files?.[0], 'scratch', 'scratch_file_url', event.target.form)} className="mt-2 block w-full text-sm text-gray-700" />
-          {uploading === 'scratch_file_url' && <p className="mt-1 text-xs text-blue-600">Mengunggah file Scratch...</p>}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nama File Scratch</label>
-          <input name="scratch_file_name" type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="file.sb3" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipe File Scratch</label>
-          <select name="scratch_file_type" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-            <option value="starter">Starter</option>
-            <option value="partial">Partial</option>
-            <option value="blank">Blank</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-          <input name="sort_order" type="number" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+
+      <div className={sectionClass}>
+        <SectionHeading icon={Sparkles} title="Klasifikasi" hint="Kategori, tingkat, dan estimasi waktu" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass}>Kategori *</label>
+            <select name="category_id" className={inputClass} required>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Tingkat Kesulitan *</label>
+            <select name="difficulty" className={inputClass} required>
+              <option value="beginner">Pemula</option>
+              <option value="intermediate">Menengah</option>
+              <option value="advanced">Lanjutan</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Estimasi Waktu (menit)</label>
+            <input name="estimated_minutes" type="number" className={inputClass} />
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Video URL / Upload Video</label>
-          <input name="video_url" type="url" className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="https://... atau unggah MP4/WebM" />
-          <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={(event) => uploadMedia(event.target.files?.[0], 'video', 'video_url', event.target.form)} className="mt-2 block w-full text-sm text-gray-700" />
-          {uploading === 'video_url' && <p className="mt-1 text-xs text-blue-600">Mengunggah video...</p>}
+
+      <div className={sectionClass}>
+        <SectionHeading icon={Upload} title="Media & File" hint="Thumbnail, project Scratch, dan video hasil" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Thumbnail URL</label>
+            <input name="thumbnail_url" type="text" className={inputClass} placeholder="Thumbnail otomatis akan diisi saat video diunggah" />
+          </div>
+          <div>
+            <label className={labelClass}>File Scratch URL / Upload .sb3</label>
+            <input name="scratch_file_url" type="text" className={inputClass} placeholder="https://... atau unggah file .sb3" />
+            <input type="file" accept=".sb3,application/octet-stream" onChange={(event) => uploadMedia(event.target.files?.[0], 'scratch', 'scratch_file_url', event.target.form)} className="mt-2 block w-full text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-primary-700" />
+            {uploading === 'scratch_file_url' && <p className="mt-1 text-xs text-primary-600">Mengunggah file Scratch...</p>}
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Video</label>
-          <select name="video_type" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-            <option value="youtube">YouTube Embed</option>
-            <option value="external">External (file upload)</option>
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass}>Nama File Scratch</label>
+            <input name="scratch_file_name" type="text" className={inputClass} placeholder="file.sb3" />
+          </div>
+          <div>
+            <label className={labelClass}>Tipe File Scratch</label>
+            <select name="scratch_file_type" className={inputClass}>
+              <option value="starter">Starter</option>
+              <option value="partial">Partial</option>
+              <option value="blank">Blank</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Sort Order</label>
+            <input name="sort_order" type="number" className={inputClass} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Video URL / Upload Video</label>
+            <input name="video_url" type="text" className={inputClass} placeholder="https://... atau unggah MP4/WebM" />
+            <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={(event) => uploadMedia(event.target.files?.[0], 'video', 'video_url', event.target.form)} className="mt-2 block w-full text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-primary-700" />
+            {uploading === 'video_url' && <p className="mt-1 text-xs text-primary-600">Mengunggah video...</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Tipe Video</label>
+            <select name="video_type" className={inputClass}>
+              <option value="youtube">YouTube Embed</option>
+              <option value="external">External (file upload)</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="block text-sm font-medium text-gray-700">Checklist Tugas</label>
+
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between gap-2">
+          <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Satu item per baris" />
           <button
             type="button"
             disabled={aiSuggestingChecklist}
@@ -498,26 +560,29 @@ Tujuan 3" />
               const problemStatement = problemInput instanceof HTMLTextAreaElement ? problemInput.value : ''
               void suggestChecklistWithAI(problemStatement, title, createChecklistText, setCreateChecklistText)
             }}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors shrink-0"
           >
+            <Wand2 className="w-3.5 h-3.5" />
             {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
           </button>
         </div>
-        <textarea value={createChecklistText} onChange={(event) => setCreateChecklistText(event.target.value)} rows={4} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500" placeholder="Satu item per baris, contoh: Tambahkan sprite kucing" />
-        <p className="mt-1 text-xs text-gray-500">Setiap baris akan menjadi satu item checklist.</p>
+        <textarea value={createChecklistText} onChange={(event) => setCreateChecklistText(event.target.value)} rows={4} className={inputClass} placeholder="Satu item per baris, contoh: Tambahkan sprite kucing" />
+        <p className={hintClass}>Setiap baris akan menjadi satu item checklist.</p>
       </div>
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
         <button
           type="button"
           onClick={() => setShowCreateModal(false)}
-          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+          className="rounded-xl bg-neutral-100 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors"
         >
           Batal
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm"
         >
+          <CheckCircle2 className="w-4 h-4" />
           Simpan Latihan
         </button>
       </div>
@@ -529,93 +594,111 @@ Tujuan 3" />
     return (
       <form onSubmit={(event) => { event.preventDefault(); handleUpdate(new FormData(event.currentTarget)) }} className="space-y-5">
         <input type="hidden" name="id" value={editingExercise.id} />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Judul</label>
-          <input name="title" defaultValue={editingExercise.title} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-          <input name="slug" defaultValue={editingExercise.slug} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi Singkat</label>
-          <textarea name="description" rows={3} defaultValue={editingExercise.short_description || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-500" />
-        </div>
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="block text-sm font-medium text-gray-700">Deskripsi Kasus (HTML)</label>
-            <button
-              type="button"
-              disabled={aiFixing}
-              onClick={() => void fixDescriptionWithAI(editingCaseDescription, editingExercise.title, setEditingCaseDescription)}
-              className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {aiFixing ? 'Memperbaiki...' : 'AI Perbaiki Deskripsi'}
-            </button>
-          </div>
-          <HtmlEditor key={editingExercise.id} name="case_description" value={editingCaseDescription} onChange={setEditingCaseDescription} placeholder="Tulis deskripsi kasus lengkap..." />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pernyataan Masalah</label>
-          <textarea name="problem_statement" rows={4} defaultValue={editingExercise.problem_statement || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+        <div className={sectionClass}>
+          <SectionHeading icon={FileText} title="Informasi Dasar" hint="Judul dan ringkasan latihan" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tingkat Kesulitan</label>
-            <select name="difficulty" defaultValue={editingExercise.difficulty} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900">
-              <option value="beginner">Pemula</option><option value="intermediate">Menengah</option><option value="advanced">Lanjutan</option>
+            <label className={labelClass}>Judul</label>
+            <input name="title" defaultValue={editingExercise.title} className={inputClass} required />
+          </div>
+          <div>
+            <label className={labelClass}>Slug</label>
+            <input name="slug" defaultValue={editingExercise.slug} className={inputClass} required />
+          </div>
+          <div>
+            <label className={labelClass}>Deskripsi Singkat</label>
+            <textarea name="description" rows={3} defaultValue={editingExercise.short_description || ''} className={inputClass} />
+          </div>
+        </div>
+
+        <div className={sectionClass}>
+          <SectionHeading icon={ListChecks} title="Konten Latihan" hint="Deskripsi kasus dan pernyataan masalah" />
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <label className={labelClass + ' mb-0'}>Deskripsi Kasus (HTML)</label>
+              <button
+                type="button"
+                disabled={aiFixing}
+                onClick={() => void fixDescriptionWithAI(editingCaseDescription, editingExercise.title, setEditingCaseDescription)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                {aiFixing ? 'Memperbaiki...' : 'AI Perbaiki Deskripsi'}
+              </button>
+            </div>
+            <HtmlEditor key={editingExercise.id} name="case_description" value={editingCaseDescription} onChange={setEditingCaseDescription} placeholder="Tulis deskripsi kasus lengkap..." />
+          </div>
+          <div>
+            <label className={labelClass}>Pernyataan Masalah</label>
+            <textarea name="problem_statement" rows={4} defaultValue={editingExercise.problem_statement || ''} className={inputClass} />
+          </div>
+        </div>
+
+        <div className={sectionClass}>
+          <SectionHeading icon={Sparkles} title="Klasifikasi & Status" hint="Kategori, tingkat, status, dan urutan" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Tingkat Kesulitan</label>
+              <select name="difficulty" defaultValue={editingExercise.difficulty} className={inputClass}>
+                <option value="beginner">Pemula</option><option value="intermediate">Menengah</option><option value="advanced">Lanjutan</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Status</label>
+              <select name="status" defaultValue={editingExercise.status} className={inputClass}>
+                <option value="draft">Draft</option><option value="published">Dipublikasikan</option><option value="archived">Arsip</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Estimasi Menit</label>
+              <input name="estimated_minutes" type="number" defaultValue={editingExercise.estimated_minutes} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Sort Order</label>
+              <input name="sort_order" type="number" defaultValue={editingExercise.sort_order} className={inputClass} />
+            </div>
+          </div>
+        </div>
+
+        <div className={sectionClass}>
+          <SectionHeading icon={Video} title="Media & File" hint="Video, thumbnail, dan project Scratch" />
+          <div>
+            <label className={labelClass}>Video URL / Upload Video</label>
+            <input name="video_url" defaultValue={editingExercise.video_url || ''} className={inputClass} />
+            <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={(event) => uploadMedia(event.target.files?.[0], 'video', 'video_url', event.target.form)} className="mt-2 block w-full text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-primary-700" />
+            {uploading === 'video_url' && <p className="mt-1 text-xs text-primary-600">Mengunggah video...</p>}
+          </div>
+          <input type="hidden" name="video_type" value={editingExercise.video_type} />
+          <input type="hidden" name="category_id" value={editingExercise.category_id || ''} />
+          <div>
+            <label className={labelClass}>Thumbnail URL</label>
+            <input name="thumbnail_url" defaultValue={editingExercise.thumbnail_url || ''} className={inputClass} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>File Scratch URL / Upload .sb3</label>
+              <input name="scratch_file_url" defaultValue={editingExercise.scratch_file_url || ''} className={inputClass} />
+              <input type="file" accept=".sb3,application/octet-stream" onChange={(event) => uploadMedia(event.target.files?.[0], 'scratch', 'scratch_file_url', event.target.form)} className="mt-2 block w-full text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-primary-700" />
+              {uploading === 'scratch_file_url' && <p className="mt-1 text-xs text-primary-600">Mengunggah file Scratch...</p>}
+            </div>
+            <div>
+              <label className={labelClass}>Nama File Scratch</label>
+              <input name="scratch_file_name" defaultValue={editingExercise.scratch_file_name || ''} className={inputClass} />
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>Tipe File Scratch</label>
+            <select name="scratch_file_type" defaultValue={editingExercise.scratch_file_type} className={inputClass}>
+              <option value="starter">Starter</option><option value="partial">Partial</option><option value="blank">Blank</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select name="status" defaultValue={editingExercise.status} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900">
-              <option value="draft">Draft</option><option value="published">Dipublikasikan</option><option value="archived">Arsip</option>
-            </select>
-          </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estimasi Menit</label>
-            <input name="estimated_minutes" type="number" defaultValue={editingExercise.estimated_minutes} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-            <input name="sort_order" type="number" defaultValue={editingExercise.sort_order} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Video URL / Upload Video</label>
-          <input name="video_url" defaultValue={editingExercise.video_url || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-          <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={(event) => uploadMedia(event.target.files?.[0], 'video', 'video_url', event.target.form)} className="mt-2 block w-full text-sm text-gray-700" />
-          {uploading === 'video_url' && <p className="mt-1 text-xs text-blue-600">Mengunggah video...</p>}
-        </div>
-        <input type="hidden" name="video_type" value={editingExercise.video_type} />
-        <input type="hidden" name="category_id" value={editingExercise.category_id || ''} />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail URL</label>
-          <input name="thumbnail_url" defaultValue={editingExercise.thumbnail_url || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">File Scratch URL / Upload .sb3</label>
-            <input name="scratch_file_url" defaultValue={editingExercise.scratch_file_url || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-            <input type="file" accept=".sb3,application/octet-stream" onChange={(event) => uploadMedia(event.target.files?.[0], 'scratch', 'scratch_file_url', event.target.form)} className="mt-2 block w-full text-sm text-gray-700" />
-            {uploading === 'scratch_file_url' && <p className="mt-1 text-xs text-blue-600">Mengunggah file Scratch...</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nama File Scratch</label>
-            <input name="scratch_file_name" defaultValue={editingExercise.scratch_file_name || ''} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipe File Scratch</label>
-          <select name="scratch_file_type" defaultValue={editingExercise.scratch_file_type} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900">
-            <option value="starter">Starter</option><option value="partial">Partial</option><option value="blank">Blank</option>
-          </select>
-        </div>
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="block text-sm font-medium text-gray-700">Checklist Tugas</label>
+
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between gap-2">
+            <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Satu item per baris" />
             <button
               type="button"
               disabled={aiSuggestingChecklist}
@@ -632,64 +715,203 @@ Tujuan 3" />
                   setEditingChecklistText,
                 )
               }}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-success-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors shrink-0"
             >
+              <Wand2 className="w-3.5 h-3.5" />
               {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
             </button>
           </div>
-          <textarea value={editingChecklistText} onChange={(event) => setEditingChecklistText(event.target.value)} rows={4} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500" placeholder="Satu item per baris" />
-          <p className="mt-1 text-xs text-gray-500">Setiap baris akan menjadi satu item checklist.</p>
+          <textarea value={editingChecklistText} onChange={(event) => setEditingChecklistText(event.target.value)} rows={4} className={inputClass} placeholder="Satu item per baris" />
+          <p className={hintClass}>Setiap baris akan menjadi satu item checklist.</p>
         </div>
+
         <input type="hidden" name="instructions" value={editingExercise.instructions.join('\n')} />
         <input type="hidden" name="learning_objectives" value={editingExercise.learning_objectives.join('\n')} />
-        <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
-          <button type="button" onClick={() => setEditingExercise(null)} className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200">Batal</button>
-          <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">Simpan Perubahan</button>
+        <div className="flex justify-end gap-3 border-t border-neutral-200 pt-4">
+          <button type="button" onClick={() => setEditingExercise(null)} className="rounded-xl bg-neutral-100 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors">Batal</button>
+          <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm">
+            <CheckCircle2 className="w-4 h-4" />
+            Simpan Perubahan
+          </button>
         </div>
       </form>
     )
   }
 
+  const statCards = [
+    { label: 'Total Latihan', value: counts.total, icon: FileText, color: 'bg-primary-100 text-primary-600' },
+    { label: 'Dipublikasikan', value: counts.published, icon: CheckCircle2, color: 'bg-success-100 text-success-600' },
+    { label: 'Draft', value: counts.draft, icon: Clock, color: 'bg-accent-100 text-accent-600' },
+    { label: 'Arsip', value: counts.archived, icon: Archive, color: 'bg-neutral-100 text-neutral-600' },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-neutral-50">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-40">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3"><LayoutDashboard className="h-6 w-6 text-blue-600" /><h1 className="text-xl font-bold text-gray-900">Admin Latihan</h1></div>
-          <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"><Plus className="h-4 w-4" />Tambah Latihan</button>
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-secondary-600 flex items-center justify-center">
+              <LayoutDashboard className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-neutral-900 leading-tight">Admin Latihan</h1>
+              <p className="text-xs text-neutral-500">Scratch Challenge</p>
+            </div>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/users" className="hidden sm:flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 transition-colors">
+              <Users className="h-4 w-4" /> Kelola User
+            </Link>
+            <LogoutButton className="hidden sm:inline-block text-sm font-medium text-neutral-600 hover:text-neutral-900" />
+            <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm">
+              <Plus className="h-4 w-4" /> Tambah Latihan
+            </button>
+          </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="mb-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-gray-900">Koneksi Google Drive</h2>
-              <p className="text-sm text-gray-600">Dapatkan Access Token OAuth untuk upload dan bagikan file kepada publik.</p>
+
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {/* Stats */}
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {statCards.map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 flex items-center gap-4">
+              <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0', color)}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-neutral-900">{value}</p>
+                <p className="text-sm text-neutral-500">{label}</p>
+              </div>
             </div>
-            {googleConnected && <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Terhubung</span>}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <a href="/api/google-drive/token?oauth=start" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              {googleConnected ? 'Hubungkan Ulang Google Drive' : 'Hubungkan dengan Google'}
-            </a>
-            {googleTokenStatus && <p className="text-sm text-gray-700">{googleTokenStatus}</p>}
-          </div>
-        </section>
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="relative"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Cari latihan..." className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-900 placeholder-gray-500" /></div>
-          <select value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900"><option value="all">Semua Kategori</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-          <select value={filterDifficulty} onChange={(event) => setFilterDifficulty(event.target.value)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900"><option value="all">Semua Tingkat</option><option value="beginner">Pemula</option><option value="intermediate">Menengah</option><option value="advanced">Lanjutan</option></select>
-          <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900"><option value="all">Semua Status</option><option value="draft">Draft</option><option value="published">Dipublikasikan</option><option value="archived">Arsip</option></select>
+          ))}
         </div>
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+
+        {/* Drive */}
+        <section className="mb-6 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary-100 text-secondary-600 flex items-center justify-center shrink-0">
+                <HardDrive className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-bold text-neutral-900">Penyimpanan Google Drive</h2>
+                <p className="text-sm text-neutral-600 max-w-2xl">Semua upload disimpan oleh akun penyimpanan aplikasi. Siapa pun yang login dapat mengunggah. Jika Drive gagal, file otomatis disimpan ke Supabase Storage.</p>
+              </div>
+            </div>
+            {driveConfigured
+              ? <span className="inline-flex items-center gap-1.5 rounded-full bg-success-100 px-3 py-1 text-xs font-semibold text-success-700 ring-1 ring-success-200"><CheckCircle2 className="w-3.5 h-3.5" />Terhubung</span>
+              : <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-100 px-3 py-1 text-xs font-semibold text-accent-700 ring-1 ring-accent-200"><Info className="w-3.5 h-3.5" />Cadangan Supabase Storage</span>}
+          </div>
+          {(googleTokenStatus || !driveConfigured) && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-neutral-50 p-3 border border-neutral-200">
+              {!driveConfigured && (
+                <a href="/api/google-drive/token?oauth=start" className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 transition-colors">
+                  Hubungkan akun penyimpanan
+                </a>
+              )}
+              {!driveConfigured && <p className="text-sm text-neutral-700">Upload tetap berjalan dan disimpan ke bucket Supabase <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs">uploads</code> sampai Drive terhubung.</p>}
+              {googleTokenStatus && <p className="text-sm text-neutral-700">{googleTokenStatus}</p>}
+            </div>
+          )}
+        </section>
+
+        {/* Filters */}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Cari latihan..." className={inputClass + ' pl-10'} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+            <select value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)} className={inputClass}><option value="all">Semua Kategori</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+            <select value={filterDifficulty} onChange={(event) => setFilterDifficulty(event.target.value)} className={inputClass}><option value="all">Semua Tingkat</option><option value="beginner">Pemula</option><option value="intermediate">Menengah</option><option value="advanced">Lanjutan</option></select>
+            <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className={inputClass}><option value="all">Semua Status</option><option value="draft">Draft</option><option value="published">Dipublikasikan</option><option value="archived">Arsip</option></select>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full"><thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Latihan</th><th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Kategori</th><th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Tingkat</th><th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th><th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Aksi</th></tr></thead>
-              <tbody className="divide-y divide-gray-200">{filteredExercises.map((exercise) => <tr key={exercise.id} className="text-gray-700"><td className="px-4 py-4"><div className="font-medium text-gray-900">{exercise.title}</div><div className="text-sm text-gray-500">/{exercise.slug}</div></td><td className="px-4 py-4">{getCategoryName(exercise.category_id)}</td><td className="px-4 py-4 capitalize">{exercise.difficulty}</td><td className="px-4 py-4"><span className={cn('rounded-full px-2 py-1 text-xs font-medium', statusStyles[exercise.status])}>{statusLabels[exercise.status]}</span></td><td className="px-4 py-4 text-right"><button onClick={() => openEditExercise(exercise)} className="mr-2 inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"><Edit className="h-4 w-4" />Edit</button><button onClick={() => handleDelete(exercise.id)} className="inline-flex items-center gap-1 text-red-600 hover:text-red-800"><Trash2 className="h-4 w-4" />Hapus</button></td></tr>)}</tbody>
+            <table className="w-full">
+              <thead className="bg-neutral-50 border-b border-neutral-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500">Latihan</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500">Kategori</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500">Tingkat</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-500">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {filteredExercises.map((exercise) => (
+                  <tr key={exercise.id} className="text-neutral-700 hover:bg-neutral-50/70 transition-colors">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-neutral-900">{exercise.title}</div>
+                      <div className="text-sm text-neutral-500">/{exercise.slug}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 ring-1 ring-primary-200">{getCategoryName(exercise.category_id)}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200">{difficultyLabels[exercise.difficulty]}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={cn('inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold', statusStyles[exercise.status])}>{statusLabels[exercise.status]}</span>
+                    </td>
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
+                      <button onClick={() => openEditExercise(exercise)} className="mr-2 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 transition-colors">
+                        <Edit className="h-4 w-4" /> Edit
+                      </button>
+                      <button onClick={() => handleDelete(exercise.id)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+                        <Trash2 className="h-4 w-4" /> Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredExercises.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-neutral-500">
+                      Tidak ada latihan yang cocok dengan filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
             </table>
           </div>
         </div>
       </main>
-      {showCreateModal && <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12"><div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><h2 className="mb-5 text-xl font-bold text-gray-900">Tambah Latihan</h2>{renderCreateForm()}</div></div>}
-      {editingExercise && <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl"><h2 className="mb-5 text-xl font-bold text-gray-900">Edit Latihan</h2>{renderEditForm()}</div></div>}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/50 backdrop-blur-sm p-4 pt-12">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl animate-scale-in">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center">
+                <Plus className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900">Tambah Latihan</h2>
+                <p className="text-sm text-neutral-500">Lengkapi detail latihan baru</p>
+              </div>
+            </div>
+            {renderCreateForm()}
+          </div>
+        </div>
+      )}
+      {editingExercise && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/50 backdrop-blur-sm p-4 pt-12">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl animate-scale-in">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center">
+                <Edit className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900">Edit Latihan</h2>
+                <p className="text-sm text-neutral-500">{editingExercise.title}</p>
+              </div>
+            </div>
+            {renderEditForm()}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

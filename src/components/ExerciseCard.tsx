@@ -1,6 +1,6 @@
 'use client'
 
-import { cn, getGoogleDriveMediaUrl } from '@/lib/utils'
+import { cn, getThumbnailSrc } from '@/lib/utils'
 import Image from 'next/image'
 import { BookOpen, CheckCircle2, Clock, Zap, PlayCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -16,6 +16,7 @@ interface ExerciseCardProps {
 export function ExerciseCard({ exercise, categories, completed = false }: ExerciseCardProps) {
   const category = categories.find((c) => c.id === exercise.category_id)
   const diffConfig = difficultyConfig[exercise.difficulty as keyof typeof difficultyConfig] || difficultyConfig.beginner
+  const thumbnailSrc = getThumbnailSrc(exercise.thumbnail_url)
 
   return (
     <article className={cn(
@@ -24,9 +25,9 @@ export function ExerciseCard({ exercise, categories, completed = false }: Exerci
       'animate-fade-in'
     )}>
       <div className="relative aspect-video overflow-hidden bg-neutral-100">
-        {exercise.thumbnail_url ? (
+        {thumbnailSrc ? (
           <Image
-            src={getGoogleDriveMediaUrl(exercise.thumbnail_url, 'thumbnail') || exercise.thumbnail_url}
+            src={thumbnailSrc}
             alt={exercise.title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
