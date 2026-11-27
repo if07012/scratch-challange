@@ -6,7 +6,11 @@ import { AdminDashboardClient } from './AdminDashboardClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+    searchParams,
+}: {
+    searchParams: Promise<{ google?: string }>
+}) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -14,14 +18,15 @@ export default async function AdminDashboard() {
         redirect('/login')
     }
 
-    const [categories, exercises] = await Promise.all([
+    const [categories, exercises, { google }] = await Promise.all([
         getCategories(),
         getAllExercisesAdmin(),
+        searchParams,
     ])
 
     return (
         <Suspense fallback={<AdminDashboardSkeleton />}>
-            <AdminDashboardClient categories={categories} exercises={exercises} />
+            <AdminDashboardClient categories={categories} exercises={exercises} googleResult={google} />
         </Suspense>
     )
 }
