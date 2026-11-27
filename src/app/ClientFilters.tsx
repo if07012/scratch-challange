@@ -2,13 +2,9 @@
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { X, Filter } from 'lucide-react'
 import { Category } from '@/lib/supabase/types'
-
-const difficulties = [
-  { id: 'beginner', name: 'Pemula', color: 'bg-green-100 text-green-700' },
-  { id: 'intermediate', name: 'Menengah', color: 'bg-blue-100 text-blue-700' },
-  { id: 'advanced', name: 'Lanjutan', color: 'bg-purple-100 text-purple-700' },
-]
+import { difficultyConfig } from '@/lib/design-system'
 
 interface ClientFiltersProps {
   categories: Category[]
@@ -41,49 +37,81 @@ export function ClientFilters({ categories }: ClientFiltersProps) {
     router.push(`/?${params.toString()}`)
   }
 
+  const hasActiveFilters = selectedCategory !== 'all' || selectedDifficulty !== 'all'
+
   return (
-    <div className="flex flex-col sm:flex-row gap-4 mb-8">
-      <div className="flex-1">
-        <label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1">
-          Kategori
-        </label>
-        <select
-          id="category-filter"
-          value={selectedCategory}
-          onChange={(e) => handleCategoryChange(e.target.value)}
-          className={cn(
-            'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'bg-white text-gray-900'
-          )}
-        >
-          <option value="all">Semua Kategori</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
+    <div className="flex flex-col gap-4 mb-8 animate-slide-in">
+      <div className="flex items-center gap-3">
+        <Filter className="w-5 h-5 text-primary-600" />
+        <span className="text-sm font-semibold text-neutral-900">Filter Latihan</span>
+        {hasActiveFilters && (
+          <button
+            onClick={() => router.push('/')}
+            className="ml-auto text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            Hapus semua
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
-      <div className="flex-1">
-        <label htmlFor="difficulty-filter" className="block text-sm font-medium text-gray-700 mb-1">
-          Tingkat Kesulitan
-        </label>
-        <select
-          id="difficulty-filter"
-          value={selectedDifficulty}
-          onChange={(e) => handleDifficultyChange(e.target.value)}
+
+      <div className="flex flex-wrap gap-2">
+        <span className="px-3 py-1.5 text-xs font-medium text-neutral-500">Kategori:</span>
+        <button
+          onClick={() => handleCategoryChange('all')}
           className={cn(
-            'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'bg-white text-gray-900'
+            'filter-chip px-3 py-1.5 text-sm font-medium rounded-full transition-all',
+            selectedCategory === 'all'
+              ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
+              : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50 hover:border-primary-300'
           )}
         >
-          <option value="all">Semua Tingkat</option>
-          {difficulties.map((diff) => (
-            <option key={diff.id} value={diff.id}>
-              {diff.name}
-            </option>
-          ))}
-        </select>
+          Semua
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => handleCategoryChange(cat.id)}
+            className={cn(
+              'filter-chip px-3 py-1.5 text-sm font-medium rounded-full transition-all',
+              selectedCategory === cat.id
+                ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
+                : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50 hover:border-primary-300'
+            )}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <span className="px-3 py-1.5 text-xs font-medium text-neutral-500">Tingkat:</span>
+        <button
+          onClick={() => handleDifficultyChange('all')}
+          className={cn(
+            'filter-chip px-3 py-1.5 text-sm font-medium rounded-full transition-all',
+            selectedDifficulty === 'all'
+              ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
+              : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50 hover:border-primary-300'
+          )}
+        >
+          Semua
+        </button>
+        {Object.entries(difficultyConfig).map(([key, config]) => (
+          <button
+            key={key}
+            onClick={() => handleDifficultyChange(key)}
+            className={cn(
+              'filter-chip px-3 py-1.5 text-sm font-medium rounded-full transition-all flex items-center gap-1.5',
+              selectedDifficulty === key
+                ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
+                : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50 hover:border-primary-300'
+            )}
+          >
+            <span aria-hidden="true" >{config.icon}</span>
+            {config.label}
+          </button>
+        ))}
       </div>
     </div>
   )

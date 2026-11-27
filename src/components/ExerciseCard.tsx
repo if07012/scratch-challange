@@ -1,80 +1,98 @@
 'use client'
 
 import { cn, getGoogleDriveMediaUrl } from '@/lib/utils'
-import { ChevronLeft, BookOpen, CheckCircle2 } from 'lucide-react'
+import Image from 'next/image'
+import { BookOpen, CheckCircle2, Clock, Zap, PlayCircle } from 'lucide-react'
 import Link from 'next/link'
 import type { Exercise, Category } from '@/lib/supabase/types'
-
-interface DifficultyConfig {
-  id: string
-  name: string
-  color: string
-}
+import { difficultyConfig } from '@/lib/design-system'
 
 interface ExerciseCardProps {
   exercise: Exercise
   categories: Category[]
-  difficulties: DifficultyConfig[]
   completed?: boolean
-  returnTo?: string
 }
 
-export function ExerciseCard({ exercise, categories, difficulties, completed = false, returnTo = '/' }: ExerciseCardProps) {
+export function ExerciseCard({ exercise, categories, completed = false }: ExerciseCardProps) {
   const category = categories.find((c) => c.id === exercise.category_id)
-  const difficulty = difficulties.find((d) => d.id === exercise.difficulty)
+  const diffConfig = difficultyConfig[exercise.difficulty as keyof typeof difficultyConfig] || difficultyConfig.beginner
 
   return (
-    <article className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-video bg-gray-100 relative overflow-hidden">
+    <article className={cn(
+      'group relative overflow-hidden rounded-2xl bg-white shadow-sm border border-neutral-200',
+      'transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary-200',
+      'animate-fade-in'
+    )}>
+      <div className="relative aspect-video overflow-hidden bg-neutral-100">
         {exercise.thumbnail_url ? (
-          <img
+          <Image
             src={getGoogleDriveMediaUrl(exercise.thumbnail_url, 'thumbnail') || exercise.thumbnail_url}
             alt={exercise.title}
-            onError={(event) => { event.currentTarget.style.display = 'none' }}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="100vw"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-            <BookOpen className="w-12 h-12" />
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
+            <BookOpen className="w-16 h-16 text-primary-300" />
           </div>
         )}
-        <div className="absolute top-3 right-3">
-          <span className={cn('px-2 py-1 text-xs font-medium rounded-full', difficulty?.color)}>
-            {difficulty?.name}
-          </span>
-        </div>
-      </div>
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        <div className="absolute top-3 left-3 flex flex-wrap gap-2">
           {category && (
-            <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', category.color_class)}>
+            <span className="badge badge-primary px-3 py-1 text-xs">
               {category.name}
             </span>
           )}
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">{exercise.title}</h3>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{exercise.short_description}</p>
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          <span className="flex items-center gap-2">
-            <span className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {exercise.estimated_minutes} menit
-            </span>
-            {completed && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Selesai
-              </span>
-            )}
+          <span className={cn(
+            'badge px-3 py-1 text-xs font-medium border',
+            diffConfig.badge
+          )}>
+            <span className="mr-1" aria-hidden="true" >{diffConfig.icon}</span>
+            {diffConfig.label}
           </span>
-          <Link
-            href={`/exercises/${exercise.slug}?from=${encodeURIComponent(returnTo)}`}
-            className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-          >
-            {completed ? 'Ulangi' : 'Mulai'} <ChevronLeft className="w-4 h-4 rotate-180" />
-          </Link>
         </div>
+
+        {completed && (
+          <div className="absolute inset-0 bg-primary-600/95 flex items-center justify-center animate-fade-in">
+            <div className="text-center p-6 animate-scale-in">
+              <CheckCircle2 className="w-16 h-16 text-white mx-auto mb-3" />
+              <p className="text-xl font-bold text-white">Tantangan Selesai</p>
+              <p className="text-primary-100 mt-1">Kerja bagus! Lanjutkan belajar.</p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="p-5 space-y-4">
+        <h3 className="text-lg font-bold text-neutral-900 line-clamp-2 group-hover:text-primary-600 transition-colors">
+          {exercise.title}
+        </h3>
+        
+        <p className="text-sm text-neutral-600 line-clamp-3 leading-relaxed">
+          {exercise.short_description || 'Tidak ada deskripsi singkat.'}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-neutral-200">
+          <div className="flex items-center gap-1.5 text-sm text-neutral-600">
+            <Clock className="w-4 h-4 shrink-0 text-neutral-400" />
+            <span>{exercise.estimated_minutes} menit</span>
+          </div>
+          
+          <div className="flex items-center gap-1.5 text-sm text-neutral-600">
+            <Zap className="w-4 h-4 shrink-0 text-neutral-400" />
+            <span className="font-medium text-neutral-900" >{diffConfig.label}</span>
+          </div>
+        </div>
+
+        <Link
+          href={`/exercises/${exercise.slug}`}
+          className="btn-primary w-full justify-center py-3 group"
+        >
+          <PlayCircle className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+          <span>{completed ? 'Ulangi Tantangan' : 'Mulai Tantangan'}</span>
+        </Link>
       </div>
     </article>
   )

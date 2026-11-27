@@ -4,7 +4,6 @@ import type {
   Exercise,
   ExerciseChecklist,
   ExerciseWithCategory,
-  CategoryWithExercises,
 } from './types'
 
 // Get all categories
