@@ -125,10 +125,7 @@ export async function getExerciseBySlug(slug: string): Promise<ExerciseWithCateg
 
   const { data: exercise, error: exerciseError } = await supabase
     .from('exercises')
-    .select(`
-      *,
-      categories (*)
-    `)
+    .select('*')
     .eq('slug', slug)
     .eq('status', 'published')
     .single()
@@ -138,12 +135,15 @@ export async function getExerciseBySlug(slug: string): Promise<ExerciseWithCateg
     return null
   }
 
-  return hydrateExercise(supabase, exercise as Exercise & { categories: Category | null })
+  return hydrateExercise(supabase, exercise as Exercise)
 }
 
+// Categories are resolved from exercise_categories instead of an embedded join:
+// the junction table gives PostgREST a second exercises<->categories path, which
+// makes `categories (*)` ambiguous.
 async function hydrateExercise(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  exercise: Exercise & { categories: Category | null },
+  exercise: Exercise,
 ): Promise<ExerciseWithCategory> {
   const [{ data: checklists, error: checklistError }, [withIds]] = await Promise.all([
     supabase
@@ -169,6 +169,7 @@ async function hydrateExercise(
 
   return {
     ...exercise,
+    categories: categoryList[0] ?? null,
     category_ids: withIds.category_ids,
     categoryList,
     checklists: checklists || [],
@@ -196,10 +197,7 @@ export async function getExerciseById(id: string): Promise<ExerciseWithCategory 
 
   const { data: exercise, error: exerciseError } = await supabase
     .from('exercises')
-    .select(`
-      *,
-      categories (*)
-    `)
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -208,7 +206,7 @@ export async function getExerciseById(id: string): Promise<ExerciseWithCategory 
     return null
   }
 
-  return hydrateExercise(supabase, exercise as Exercise & { categories: Category | null })
+  return hydrateExercise(supabase, exercise as Exercise)
 }
 
 // Create new exercise

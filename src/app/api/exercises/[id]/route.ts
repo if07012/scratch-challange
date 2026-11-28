@@ -11,7 +11,7 @@ export async function GET(
 
   const { data: exercise, error: exerciseError } = await supabase
     .from('exercises')
-    .select('*, categories(*)')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -39,10 +39,18 @@ export async function GET(
     ? [exercise.category_id, ...linkIds.filter((categoryId) => categoryId !== exercise.category_id)]
     : linkIds.length ? linkIds : exercise.category_id ? [exercise.category_id] : []
 
+  const { data: categoryRows } = category_ids.length
+    ? await supabase.from('categories').select('*').in('id', category_ids)
+    : { data: [] }
+
+  const byId = new Map((categoryRows || []).map((category) => [category.id, category]))
+  const categoryList = category_ids.map((categoryId) => byId.get(categoryId)).filter(Boolean)
+
   return NextResponse.json({
     exercise: {
       ...exercise,
-      categories: exercise.categories,
+      categories: categoryList[0] ?? null,
+      categoryList,
       category_ids,
       checklists: checklists || [],
     }
