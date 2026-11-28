@@ -21,6 +21,7 @@ import {
   HardDrive,
   Wand2,
   Info,
+  ArrowLeft,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Exercise, ExerciseChecklist } from '@/lib/supabase/types'
@@ -82,10 +83,10 @@ function HtmlEditor({ name, value, onChange, placeholder }: { name: string; valu
   )
 }
 
-const inputClass = 'w-full rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition'
+const inputClass = 'w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 sm:py-2.5 text-base sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition'
 const labelClass = 'block text-sm font-semibold text-neutral-700 mb-1.5'
 const hintClass = 'mt-1 text-xs text-neutral-500'
-const sectionClass = 'rounded-2xl border border-neutral-200 bg-neutral-50/70 p-4 sm:p-5 space-y-4'
+const sectionClass = 'rounded-2xl border border-neutral-200/80 bg-white p-5 sm:p-6 space-y-5 shadow-sm'
 
 function SectionHeading({ icon: Icon, title, hint }: { icon: React.ComponentType<{ className?: string }>; title: string; hint?: string }) {
   return (
@@ -570,17 +571,17 @@ Tujuan 3" />
         <p className={hintClass}>Setiap baris akan menjadi satu item checklist.</p>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
+      <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-3 border-t border-neutral-200 bg-white/90 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:flex-row sm:justify-end sm:px-6">
         <button
           type="button"
           onClick={() => setShowCreateModal(false)}
-          className="rounded-xl bg-neutral-100 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors"
+          className="rounded-xl bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors sm:py-2.5"
         >
           Batal
         </button>
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm sm:py-2.5"
         >
           <CheckCircle2 className="w-4 h-4" />
           Simpan Latihan
@@ -727,9 +728,9 @@ Tujuan 3" />
 
         <input type="hidden" name="instructions" value={editingExercise.instructions.join('\n')} />
         <input type="hidden" name="learning_objectives" value={editingExercise.learning_objectives.join('\n')} />
-        <div className="flex justify-end gap-3 border-t border-neutral-200 pt-4">
-          <button type="button" onClick={() => setEditingExercise(null)} className="rounded-xl bg-neutral-100 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors">Batal</button>
-          <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm">
+        <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-3 border-t border-neutral-200 bg-white/90 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:flex-row sm:justify-end sm:px-6">
+          <button type="button" onClick={() => setEditingExercise(null)} className="rounded-xl bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-700 hover:bg-neutral-200 transition-colors sm:py-2.5">Batal</button>
+          <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-700 transition-colors shadow-sm sm:py-2.5">
             <CheckCircle2 className="w-4 h-4" />
             Simpan Perubahan
           </button>
@@ -884,33 +885,37 @@ Tujuan 3" />
       </main>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/50 backdrop-blur-sm p-4 pt-12">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl animate-scale-in">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center">
-                <Plus className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-neutral-900">Tambah Latihan</h2>
-                <p className="text-sm text-neutral-500">Lengkapi detail latihan baru</p>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-50 animate-fade-in">
+          <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur-md">
+            <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 sm:px-6">
+              <button type="button" onClick={() => setShowCreateModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors" aria-label="Kembali">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-neutral-900">Tambah Latihan</h2>
+                <p className="truncate text-xs text-neutral-500">Lengkapi detail latihan baru</p>
               </div>
             </div>
+          </div>
+          <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
             {renderCreateForm()}
           </div>
         </div>
       )}
       {editingExercise && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/50 backdrop-blur-sm p-4 pt-12">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl animate-scale-in">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center">
-                <Edit className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-neutral-900">Edit Latihan</h2>
-                <p className="text-sm text-neutral-500">{editingExercise.title}</p>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-50 animate-fade-in">
+          <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur-md">
+            <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 sm:px-6">
+              <button type="button" onClick={() => setEditingExercise(null)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors" aria-label="Kembali">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-neutral-900">Edit Latihan</h2>
+                <p className="truncate text-xs text-neutral-500">{editingExercise.title}</p>
               </div>
             </div>
+          </div>
+          <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
             {renderEditForm()}
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { X, Filter } from 'lucide-react'
 import { Category } from '@/lib/supabase/types'
@@ -13,6 +13,7 @@ interface ClientFiltersProps {
 export function ClientFilters({ categories }: ClientFiltersProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
 
   const selectedCategory = searchParams.get('category') || 'all'
   const selectedDifficulty = searchParams.get('difficulty') || 'all'
@@ -24,7 +25,8 @@ export function ClientFilters({ categories }: ClientFiltersProps) {
     } else {
       params.set('category', value)
     }
-    router.push(`/?${params.toString()}`)
+    const query = params.toString()
+    router.push(query ? `${pathname}?${query}` : pathname)
   }
 
   const handleDifficultyChange = (value: string) => {
@@ -34,7 +36,8 @@ export function ClientFilters({ categories }: ClientFiltersProps) {
     } else {
       params.set('difficulty', value)
     }
-    router.push(`/?${params.toString()}`)
+    const query = params.toString()
+    router.push(query ? `${pathname}?${query}` : pathname)
   }
 
   const hasActiveFilters = selectedCategory !== 'all' || selectedDifficulty !== 'all'
@@ -46,7 +49,7 @@ export function ClientFilters({ categories }: ClientFiltersProps) {
         <span className="text-sm font-semibold text-neutral-900">Filter Latihan</span>
         {hasActiveFilters && (
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push(pathname)}
             className="ml-auto text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
           >
             Hapus semua
