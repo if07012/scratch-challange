@@ -759,6 +759,9 @@ Tujuan 3" />
             </div>
           </Link>
           <div className="flex items-center gap-2">
+            <Link href="/admin/submissions" className="hidden sm:flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 transition-colors">
+              <Upload className="h-4 w-4" /> Hasil Siswa
+            </Link>
             <Link href="/admin/users" className="hidden sm:flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 hover:bg-neutral-50 transition-colors">
               <Users className="h-4 w-4" /> Kelola User
             </Link>

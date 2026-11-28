@@ -1,5 +1,6 @@
 import { createClient } from './server'
 import type {
+  AdminSubmission,
   Category,
   Exercise,
   ExerciseChecklist,
@@ -187,6 +188,22 @@ export async function updateExercise(id: string, updates: Partial<Exercise>): Pr
     return null
   }
   return data
+}
+
+// Student submissions/progress for admins (view filters to admin JWTs).
+export async function getAdminSubmissions(): Promise<AdminSubmission[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('admin_student_submissions')
+    .select('*')
+    .order('submitted_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching submissions:', error)
+    return []
+  }
+  return data || []
 }
 
 // Delete exercise

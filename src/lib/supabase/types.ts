@@ -62,6 +62,22 @@ export type StudentChecklistProgress = {
   created_at: string
 }
 
+export type AdminSubmission = {
+  user_id: string
+  email: string | null
+  exercise_id: string
+  exercise_title: string
+  exercise_slug: string
+  category_id: string | null
+  status: 'in_progress' | 'completed'
+  submitted_scratch_url: string | null
+  submitted_scratch_name: string | null
+  submitted_at: string | null
+  created_at: string
+  checklist_done: number
+  checklist_total: number
+}
+
 export type ExerciseWithCategory = Exercise & {
   categories: Category | null
   checklists: ExerciseChecklist[]

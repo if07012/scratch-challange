@@ -14,6 +14,7 @@ import {
   Target,
   ListChecks,
   ShieldCheck,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import Image from 'next/image'
@@ -176,6 +177,27 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
       setSubmittedFileUrl(result.url)
       setSubmittedFileName(file.name)
       setSubmittedAt(submittedAtValue)
+    }
+    setProgressSaving(false)
+  }
+
+  async function deleteSubmission() {
+    if (!userId) return
+    if (!confirm('Hapus file yang sudah kamu unggah? File akan dihapus permanen.')) return
+    setUploadError(null)
+    setProgressSaving(true)
+    const response = await fetch('/api/submissions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exercise_id: exercise.id }),
+    })
+    const result = await response.json() as { error?: string }
+    if (!response.ok) {
+      setUploadError(result.error || 'Gagal menghapus file Scratch')
+    } else {
+      setSubmittedFileUrl(null)
+      setSubmittedFileName(null)
+      setSubmittedAt(null)
     }
     setProgressSaving(false)
   }
@@ -530,6 +552,17 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
                         <Download className="w-4 h-4" />
                         Unduh hasil unggahan
                       </a>
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={deleteSubmission}
+                          disabled={progressSaving}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Hapus file
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
