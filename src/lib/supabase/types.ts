@@ -13,6 +13,8 @@ export type Category = {
 export type Exercise = {
   id: string
   category_id: string | null
+  /** Primary category (category_id), then the rest from exercise_categories. */
+  category_ids: string[]
   title: string
   slug: string
   short_description: string | null
@@ -80,6 +82,8 @@ export type AdminSubmission = {
 
 export type ExerciseWithCategory = Exercise & {
   categories: Category | null
+  /** All categories the exercise belongs to, primary first. */
+  categoryList: Category[]
   checklists: ExerciseChecklist[]
 }
 

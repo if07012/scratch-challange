@@ -219,7 +219,8 @@ export default async function Home({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {recommendedExercises.map((exercise) => {
-                const category = categoriesWithCounts.find((c) => c.id === exercise.category_id)
+                const ids = exercise.category_ids?.length ? exercise.category_ids : exercise.category_id ? [exercise.category_id] : []
+                const exerciseCategories = categoriesWithCounts.filter((c) => ids.includes(c.id))
                 const diffConfig = difficultyConfig[exercise.difficulty as keyof typeof difficultyConfig] || difficultyConfig.beginner
                 return (
                   <Link
@@ -245,11 +246,11 @@ export default async function Home({
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mb-4">
-                      {category && (
-                        <span className="badge badge-primary px-2.5 py-1 text-xs">
+                      {exerciseCategories.map((category) => (
+                        <span key={category.id} className="badge badge-primary px-2.5 py-1 text-xs">
                           {category.name}
                         </span>
-                      )}
+                      ))}
                       <span className={cn(
                         "badge px-2.5 py-1 text-xs font-medium border flex items-center gap-1",
                         diffConfig.badge

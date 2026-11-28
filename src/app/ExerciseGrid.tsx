@@ -24,7 +24,8 @@ export async function ExerciseGrid({ searchParams }: ExerciseGridProps) {
   const completedExerciseIds = (progressResult.data || []).map((item) => item.exercise_id)
 
   const filteredExercises = exercises.filter((exercise) => {
-    const categoryMatch = selectedCategory === 'all' || exercise.category_id === selectedCategory
+    const categoryMatch = selectedCategory === 'all'
+      || (exercise.category_ids?.length ? exercise.category_ids.includes(selectedCategory) : exercise.category_id === selectedCategory)
     const difficultyMatch = selectedDifficulty === 'all' || exercise.difficulty === selectedDifficulty
     return categoryMatch && difficultyMatch
   })

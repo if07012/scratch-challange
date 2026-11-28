@@ -269,11 +269,11 @@ export function ExerciseDetailClient({ exercise }: ExerciseDetailClientProps) {
                 <p className="mt-3 text-primary-100 text-base sm:text-lg max-w-2xl">{exercise.short_description}</p>
               )}
               <div className="mt-5 flex flex-wrap items-center gap-2">
-                {category && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/15 text-white ring-1 ring-white/20">
-                    {category.name}
+                {(exercise.categoryList?.length ? exercise.categoryList : category ? [category] : []).map((item) => (
+                  <span key={item.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/15 text-white ring-1 ring-white/20">
+                    {item.name}
                   </span>
-                )}
+                ))}
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-white/15 text-white ring-1 ring-white/20">
                   <span aria-hidden="true">{diffConfig.icon}</span> {diffConfig.label}
                 </span>

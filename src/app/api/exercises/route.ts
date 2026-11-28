@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncCategories } from '@/lib/exercise-categories'
 
 export async function GET() {
   const supabase = await createClient()
@@ -20,12 +21,14 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
   const body = await request.json()
-  const { category_id, title, slug, short_description, case_description, problem_statement, instructions, learning_objectives, difficulty, estimated_minutes, thumbnail_url, scratch_file_url, scratch_file_name, scratch_file_type, video_url, video_type, status, sort_order } = body
+  const { category_id, category_ids, title, slug, short_description, case_description, problem_statement, instructions, learning_objectives, difficulty, estimated_minutes, thumbnail_url, scratch_file_url, scratch_file_name, scratch_file_type, video_url, video_type, status, sort_order } = body
+  const categoryIds: string[] = Array.isArray(category_ids) ? category_ids.filter(Boolean) : category_id ? [category_id] : []
+  const primaryCategoryId = category_id || categoryIds[0] || null
 
   const { data, error } = await supabase
     .from('exercises')
     .insert({
-      category_id,
+      category_id: primaryCategoryId,
       title,
       slug,
       short_description,
@@ -49,6 +52,11 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const syncError = await syncCategories(supabase, data.id, categoryIds)
+  if (syncError) {
+    return NextResponse.json({ exercise: data, warning: `Latihan dibuat, tetapi kategori gagal disimpan: ${syncError}` }, { status: 201 })
   }
 
   return NextResponse.json({ exercise: data }, { status: 201 })

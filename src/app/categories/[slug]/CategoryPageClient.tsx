@@ -148,10 +148,10 @@ function CategoryFilters({
     const map: Record<string, number> = { all: exercises.length }
     categories.forEach(c => map[c.slug] = 0)
     exercises.forEach(ex => {
-      if (ex.category_id) {
-        const cat = categories.find(c => c.id === ex.category_id)
-        if (cat) map[cat.slug] = (map[cat.slug] || 0) + 1
-      }
+      const ids = ex.category_ids?.length ? ex.category_ids : ex.category_id ? [ex.category_id] : []
+      categories.filter(c => ids.includes(c.id)).forEach(cat => {
+        map[cat.slug] = (map[cat.slug] || 0) + 1
+      })
     })
     return map
   }, [exercises, categories])
@@ -268,8 +268,10 @@ export function CategoryPageClient({ category, exercises, categories }: Category
       const matchesSearch = exercise.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         exercise.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
 
-      const matchesCategory = selectedCategory === 'all' || exercise.category_id ===
-        categories.find(c => c.slug === selectedCategory)?.id
+      const categoryId = categories.find(c => c.slug === selectedCategory)?.id
+      const matchesCategory = selectedCategory === 'all' || (exercise.category_ids?.length
+        ? exercise.category_ids.includes(categoryId || '')
+        : exercise.category_id === categoryId)
 
       const matchesDifficulty = selectedDifficulty === 'all' || exercise.difficulty === selectedDifficulty
 

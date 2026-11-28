@@ -14,7 +14,8 @@ interface ExerciseCardProps {
 }
 
 export function ExerciseCard({ exercise, categories, completed = false }: ExerciseCardProps) {
-  const category = categories.find((c) => c.id === exercise.category_id)
+  const categoryIds = exercise.category_ids?.length ? exercise.category_ids : exercise.category_id ? [exercise.category_id] : []
+  const exerciseCategories = categories.filter((c) => categoryIds.includes(c.id))
   const diffConfig = difficultyConfig[exercise.difficulty as keyof typeof difficultyConfig] || difficultyConfig.beginner
   const thumbnailSrc = getThumbnailSrc(exercise.thumbnail_url)
 
@@ -41,11 +42,11 @@ export function ExerciseCard({ exercise, categories, completed = false }: Exerci
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         
         <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-          {category && (
-            <span className="badge badge-primary px-3 py-1 text-xs">
+          {exerciseCategories.map((category) => (
+            <span key={category.id} className="badge badge-primary px-3 py-1 text-xs">
               {category.name}
             </span>
-          )}
+          ))}
           <span className={cn(
             'badge px-3 py-1 text-xs font-medium border',
             diffConfig.badge

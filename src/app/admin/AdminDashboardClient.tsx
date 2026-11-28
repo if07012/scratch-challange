@@ -26,6 +26,91 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Exercise, ExerciseChecklist } from '@/lib/supabase/types'
 
+function ChecklistEditor({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const items = value.split('\n').map((item) => item.trim()).filter(Boolean)
+  const commit = (next: string[]) => onChange(next.join('\n'))
+
+  return (
+    <div className="space-y-2">
+      {items.length === 0 && (
+        <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-3 text-sm text-neutral-500">Belum ada checklist. Tambahkan item pertama.</p>
+      )}
+      <ul className="space-y-2">
+        {items.map((item, index) => (
+          <li key={index} className="flex items-start gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2">
+            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-xs font-bold text-primary-700">{index + 1}</span>
+            <span className="flex-1 break-words text-sm text-neutral-800">{item}</span>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => commit(items.filter((_, i) => i !== index))}
+              className="rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+              aria-label={`Hapus item ${index + 1}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          className={inputClass}
+          placeholder="Tambah item checklist..."
+          disabled={disabled}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            const input = event.currentTarget
+            const item = input.value.trim()
+            if (!item) return
+            commit([...items, item])
+            input.value = ''
+          }}
+        />
+      </div>
+      <p className="text-xs text-neutral-500">Tekan Enter untuk menambah item. Checklist bisa lebih dari satu.</p>
+    </div>
+  )
+}
+
+function CategoryMultiSelect({ categories, value, onChange }: { categories: Category[]; value: string[]; onChange: (value: string[]) => void }) {
+  const toggle = (id: string) => {
+    onChange(value.includes(id) ? value.filter((item) => item !== id) : [...value, id])
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {categories.map((category) => {
+        const selected = value.includes(category.id)
+        const index = value.indexOf(category.id)
+        return (
+          <button
+            key={category.id}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => toggle(category.id)}
+            className={cn(
+              'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors',
+              selected
+                ? 'border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-500/30'
+                : 'border-neutral-300 bg-white text-neutral-700 hover:border-primary-300 hover:bg-neutral-50',
+            )}
+          >
+            <span className={cn(
+              'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold',
+              selected ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-300 text-transparent',
+            )}>
+              {selected ? index + 1 : '·'}
+            </span>
+            <span className="truncate">{category.name}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function HtmlEditor({ name, value, onChange, placeholder }: { name: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   const editorRef = useRef<HTMLDivElement>(null)
 
@@ -85,7 +170,6 @@ function HtmlEditor({ name, value, onChange, placeholder }: { name: string; valu
 
 const inputClass = 'w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 sm:py-2.5 text-base sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition'
 const labelClass = 'block text-sm font-semibold text-neutral-700 mb-1.5'
-const hintClass = 'mt-1 text-xs text-neutral-500'
 const sectionClass = 'rounded-2xl border border-neutral-200/80 bg-white p-5 sm:p-6 space-y-5 shadow-sm'
 
 function SectionHeading({ icon: Icon, title, hint }: { icon: React.ComponentType<{ className?: string }>; title: string; hint?: string }) {
@@ -125,6 +209,8 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
   const [editingChecklists, setEditingChecklists] = useState<ExerciseChecklist[]>([])
   const [createCaseDescription, setCreateCaseDescription] = useState('')
   const [editingCaseDescription, setEditingCaseDescription] = useState('')
+  const [createCategoryIds, setCreateCategoryIds] = useState<string[]>([])
+  const [editingCategoryIds, setEditingCategoryIds] = useState<string[]>([])
   const [aiFixing, setAiFixing] = useState(false)
   const [aiSuggestingChecklist, setAiSuggestingChecklist] = useState(false)
 
@@ -135,7 +221,7 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
   const filteredExercises = exercises.filter((exercise) => {
     const matchesSearch = exercise.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          exercise.slug.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = filterCategory === 'all' || exercise.category_id === filterCategory
+    const matchesCategory = filterCategory === 'all' || exercise.category_ids?.includes(filterCategory) || exercise.category_id === filterCategory
     const matchesDifficulty = filterDifficulty === 'all' || exercise.difficulty === filterDifficulty
     const matchesStatus = filterStatus === 'all' || exercise.status === filterStatus
     return matchesSearch && matchesCategory && matchesDifficulty && matchesStatus
@@ -166,10 +252,10 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
     archived: exercises.filter((item) => item.status === 'archived').length,
   }
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return 'Tanpa Kategori'
-    const cat = categories.find(c => c.id === categoryId)
-    return cat?.name || categoryId
+  const getCategoryNames = (exercise: Exercise) => {
+    const ids = exercise.category_ids?.length ? exercise.category_ids : exercise.category_id ? [exercise.category_id] : []
+    const names = ids.map((id) => categories.find((cat) => cat.id === id)?.name).filter(Boolean)
+    return names.length ? names : ['Tanpa Kategori']
   }
 
   const handleCreate = async (formData: FormData) => {
@@ -179,7 +265,8 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
     const learningObjectives = data.learning_objectives ? String(data.learning_objectives).split('\n').filter(Boolean) : []
 
     const payload = {
-      category_id: data.category_id || null,
+      category_id: createCategoryIds[0] || null,
+      category_ids: createCategoryIds,
       title: data.title,
       slug: data.slug,
       short_description: data.description || null,
@@ -233,7 +320,8 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
     const learningObjectives = data.learning_objectives ? String(data.learning_objectives).split('\n').filter(Boolean) : []
 
     const payload = {
-      category_id: data.category_id || null,
+      category_id: editingCategoryIds[0] || null,
+      category_ids: editingCategoryIds,
       title: data.title,
       slug: data.slug,
       short_description: data.description || null,
@@ -265,16 +353,29 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
       return
     }
 
-    for (const item of editingChecklists) {
-      await fetch(`/api/checklists/${item.id}`, { method: 'DELETE' })
-    }
+    // Reconcile in order so existing checklist IDs (and student progress) survive.
     const checklistItems = editingChecklistText.split('\n').map((item) => item.trim()).filter(Boolean)
-    for (const [index, description] of checklistItems.entries()) {
-      await fetch(`/api/exercises/${id}/checklists`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, sort_order: index }),
-      })
+    const rows = Math.max(editingChecklists.length, checklistItems.length)
+    for (let i = 0; i < rows; i++) {
+      const existing = editingChecklists[i]
+      const description = checklistItems[i]
+      if (existing && description) {
+        if (existing.description !== description || existing.sort_order !== i) {
+          await fetch(`/api/checklists/${existing.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description, sort_order: i }),
+          })
+        }
+      } else if (existing) {
+        await fetch(`/api/checklists/${existing.id}`, { method: 'DELETE' })
+      } else if (description) {
+        await fetch(`/api/exercises/${id}/checklists`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description, sort_order: i }),
+        })
+      }
     }
 
     alert('Latihan berhasil diperbarui!')
@@ -343,12 +444,14 @@ export function AdminDashboardClient({ categories, exercises, googleResult, driv
   const openEditExercise = async (exercise: Exercise) => {
     setEditingExercise(exercise)
     setEditingCaseDescription(exercise.case_description || '')
+    setEditingCategoryIds(exercise.category_ids?.length ? exercise.category_ids : exercise.category_id ? [exercise.category_id] : [])
     try {
       const response = await fetch(`/api/exercises/${exercise.id}`)
       const result = await response.json() as { exercise?: Exercise & { checklists?: ExerciseChecklist[] } }
       const checklists = result.exercise?.checklists || []
       setEditingChecklists(checklists)
       setEditingChecklistText(checklists.map((item) => item.description).join('\n'))
+      if (result.exercise?.category_ids) setEditingCategoryIds(result.exercise.category_ids)
     } catch {
       setEditingChecklists([])
       setEditingChecklistText('')
@@ -473,16 +576,13 @@ Tujuan 3" />
       </div>
 
       <div className={sectionClass}>
-        <SectionHeading icon={Sparkles} title="Klasifikasi" hint="Kategori, tingkat, dan estimasi waktu" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className={labelClass}>Kategori *</label>
-            <select name="category_id" className={inputClass} required>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-          </div>
+        <SectionHeading icon={Sparkles} title="Klasifikasi" hint="Pilih satu atau lebih kategori, tingkat, dan estimasi waktu" />
+        <div>
+          <label className={labelClass}>Kategori * <span className="font-normal text-neutral-500">(bisa lebih dari satu)</span></label>
+          <CategoryMultiSelect categories={categories} value={createCategoryIds} onChange={setCreateCategoryIds} />
+          {createCategoryIds.length > 1 && <p className="mt-1.5 text-xs text-neutral-500">Kategori pertama menjadi kategori utama latihan.</p>}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Tingkat Kesulitan *</label>
             <select name="difficulty" className={inputClass} required>
@@ -549,7 +649,7 @@ Tujuan 3" />
 
       <div className={sectionClass}>
         <div className="flex items-center justify-between gap-2">
-          <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Satu item per baris" />
+          <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Bisa lebih dari satu item" />
           <button
             type="button"
             disabled={aiSuggestingChecklist}
@@ -567,8 +667,7 @@ Tujuan 3" />
             {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
           </button>
         </div>
-        <textarea value={createChecklistText} onChange={(event) => setCreateChecklistText(event.target.value)} rows={4} className={inputClass} placeholder="Satu item per baris, contoh: Tambahkan sprite kucing" />
-        <p className={hintClass}>Setiap baris akan menjadi satu item checklist.</p>
+        <ChecklistEditor value={createChecklistText} onChange={setCreateChecklistText} disabled={aiSuggestingChecklist} />
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-3 border-t border-neutral-200 bg-white/90 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:flex-row sm:justify-end sm:px-6">
@@ -637,6 +736,11 @@ Tujuan 3" />
 
         <div className={sectionClass}>
           <SectionHeading icon={Sparkles} title="Klasifikasi & Status" hint="Kategori, tingkat, status, dan urutan" />
+          <div>
+            <label className={labelClass}>Kategori <span className="font-normal text-neutral-500">(bisa lebih dari satu)</span></label>
+            <CategoryMultiSelect categories={categories} value={editingCategoryIds} onChange={setEditingCategoryIds} />
+            {editingCategoryIds.length > 1 && <p className="mt-1.5 text-xs text-neutral-500">Kategori pertama menjadi kategori utama latihan.</p>}
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelClass}>Tingkat Kesulitan</label>
@@ -672,7 +776,6 @@ Tujuan 3" />
             {uploading === 'video_url' && <p className="mt-1 text-xs text-primary-600">Mengunggah video...</p>}
           </div>
           <input type="hidden" name="video_type" value={editingExercise.video_type} />
-          <input type="hidden" name="category_id" value={editingExercise.category_id || ''} />
           <div>
             <label className={labelClass}>Thumbnail URL</label>
             <input name="thumbnail_url" defaultValue={editingExercise.thumbnail_url || ''} className={inputClass} />
@@ -699,7 +802,7 @@ Tujuan 3" />
 
         <div className={sectionClass}>
           <div className="flex items-center justify-between gap-2">
-            <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Satu item per baris" />
+            <SectionHeading icon={CheckCircle2} title="Checklist Tugas" hint="Bisa lebih dari satu item" />
             <button
               type="button"
               disabled={aiSuggestingChecklist}
@@ -722,8 +825,8 @@ Tujuan 3" />
               {aiSuggestingChecklist ? 'Menyusun...' : 'AI Sarankan Checklist'}
             </button>
           </div>
-          <textarea value={editingChecklistText} onChange={(event) => setEditingChecklistText(event.target.value)} rows={4} className={inputClass} placeholder="Satu item per baris" />
-          <p className={hintClass}>Setiap baris akan menjadi satu item checklist.</p>
+          <textarea value={editingChecklistText} onChange={(event) => setEditingChecklistText(event.target.value)} rows={5} className={inputClass} placeholder="Satu item per baris" />
+          <ChecklistEditor value={editingChecklistText} onChange={setEditingChecklistText} disabled={aiSuggestingChecklist} />
         </div>
 
         <input type="hidden" name="instructions" value={editingExercise.instructions.join('\n')} />
@@ -853,7 +956,11 @@ Tujuan 3" />
                       <div className="text-sm text-neutral-500">/{exercise.slug}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 ring-1 ring-primary-200">{getCategoryName(exercise.category_id)}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {getCategoryNames(exercise).map((name) => (
+                          <span key={name} className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 ring-1 ring-primary-200">{name}</span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200">{difficultyLabels[exercise.difficulty]}</span>
